@@ -55,12 +55,30 @@ async function sendTestMessage(chatId) {
  */
 async function sendPriceAlert(chatId, marketQuestion, outcome, triggerType, thresholdPrice, currentPrice, url) {
   const symbol = outcome.toUpperCase();
-  const dirSymbol = triggerType === 'price_above' ? '📈' : '📉';
-  const dirText = triggerType === 'price_above' ? 'üzerine çıktı' : 'altına düştü';
+  let dirSymbol = '📈';
+  let dirText = '';
+  let priceTypeText = 'Orta Fiyat (Mid Price)';
+
+  if (triggerType === 'price_above') {
+    dirSymbol = '📈';
+    dirText = 'üzerine çıktı';
+  } else if (triggerType === 'price_below') {
+    dirSymbol = '📉';
+    dirText = 'altına düştü';
+  } else if (triggerType === 'bid_above') {
+    dirSymbol = '📈';
+    dirText = 'üzerine çıktı';
+    priceTypeText = 'En İyi Alış (Best Bid)';
+  } else if (triggerType === 'ask_below') {
+    dirSymbol = '📉';
+    dirText = 'altına düştü';
+    priceTypeText = 'En İyi Satış (Best Ask)';
+  }
 
   const html = `${dirSymbol} <b>Polymarket Fiyat Alarmı Tetiklendi!</b>\n\n` +
                `<b>Pazar:</b> ${marketQuestion}\n` +
                `<b>Seçenek:</b> <code>${symbol}</code>\n` +
+               `<b>Fiyat Türü:</b> ${priceTypeText}\n` +
                `<b>Hedef Fiyat:</b> ${thresholdPrice.toFixed(2)}$\n` +
                `<b>Güncel Fiyat:</b> <b>${currentPrice.toFixed(2)}$</b> (${dirText})\n\n` +
                `🔗 <a href="${url}">Polymarket'te Görüntüle</a>`;

@@ -295,7 +295,7 @@ function renderOrderbook(book) {
 alarmTypeSelect.addEventListener('change', () => {
   const type = alarmTypeSelect.value;
   
-  if (type === 'price_above' || type === 'price_below') {
+  if (type === 'price_above' || type === 'price_below' || type === 'bid_above' || type === 'ask_below') {
     thresholdLabel.textContent = 'Fiyat Limiti ($)';
     thresholdSuffix.textContent = '$';
     thresholdValueInput.step = '0.01';
@@ -456,11 +456,19 @@ async function fetchAlarms() {
       
       switch (alarm.alarmType) {
         case 'price_above':
-          typeText = 'Fiyat Üzeri 📈';
+          typeText = 'Orta Fiyat Üzeri 📈';
           targetSuffix = '$';
           break;
         case 'price_below':
-          typeText = 'Fiyat Altı 📉';
+          typeText = 'Orta Fiyat Altı 📉';
+          targetSuffix = '$';
+          break;
+        case 'bid_above':
+          typeText = 'Best Bid Üzeri 📈';
+          targetSuffix = '$';
+          break;
+        case 'ask_below':
+          typeText = 'Best Ask Altı 📉';
           targetSuffix = '$';
           break;
         case 'wall_created':

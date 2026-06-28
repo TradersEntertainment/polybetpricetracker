@@ -190,7 +190,7 @@ async function checkMarketsAndTriggerAlarms() {
             const sent = db.hasAlertBeenSentRecently(alarm.marketId, 'price_above', alarm.outcome, alarm.threshold, currentPrice, alarm.chatId, 15);
             if (!sent) {
               triggerAlert = true;
-              alertDetails = `Fiyat üst sınıra ulaştı. Hedef: ${alarm.threshold}, Güncel: ${currentPrice}`;
+              alertDetails = `Orta Fiyat üst sınıra ulaştı. Hedef: ${alarm.threshold}, Güncel: ${currentPrice}`;
               
               await telegram.sendPriceAlert(alarm.chatId, alarm.title, alarm.outcome, 'price_above', alarm.threshold, currentPrice, alarm.url);
               db.markAlertSent(alarm.marketId, 'price_above', alarm.outcome, alarm.threshold, currentPrice, alarm.chatId);
@@ -202,10 +202,36 @@ async function checkMarketsAndTriggerAlarms() {
             const sent = db.hasAlertBeenSentRecently(alarm.marketId, 'price_below', alarm.outcome, alarm.threshold, currentPrice, alarm.chatId, 15);
             if (!sent) {
               triggerAlert = true;
-              alertDetails = `Fiyat alt sınıra ulaştı. Hedef: ${alarm.threshold}, Güncel: ${currentPrice}`;
+              alertDetails = `Orta Fiyat alt sınıra ulaştı. Hedef: ${alarm.threshold}, Güncel: ${currentPrice}`;
               
               await telegram.sendPriceAlert(alarm.chatId, alarm.title, alarm.outcome, 'price_below', alarm.threshold, currentPrice, alarm.url);
               db.markAlertSent(alarm.marketId, 'price_below', alarm.outcome, alarm.threshold, currentPrice, alarm.chatId);
+            }
+          }
+        } 
+        else if (alarm.alarmType === 'bid_above') {
+          const bidPrice = currentBook.bestBid;
+          if (bidPrice !== null && bidPrice >= alarm.threshold) {
+            const sent = db.hasAlertBeenSentRecently(alarm.marketId, 'bid_above', alarm.outcome, alarm.threshold, bidPrice, alarm.chatId, 15);
+            if (!sent) {
+              triggerAlert = true;
+              alertDetails = `Best Bid üst sınıra ulaştı. Hedef: ${alarm.threshold}, Güncel: ${bidPrice}`;
+              
+              await telegram.sendPriceAlert(alarm.chatId, alarm.title, alarm.outcome, 'bid_above', alarm.threshold, bidPrice, alarm.url);
+              db.markAlertSent(alarm.marketId, 'bid_above', alarm.outcome, alarm.threshold, bidPrice, alarm.chatId);
+            }
+          }
+        }
+        else if (alarm.alarmType === 'ask_below') {
+          const askPrice = currentBook.bestAsk;
+          if (askPrice !== null && askPrice <= alarm.threshold) {
+            const sent = db.hasAlertBeenSentRecently(alarm.marketId, 'ask_below', alarm.outcome, alarm.threshold, askPrice, alarm.chatId, 15);
+            if (!sent) {
+              triggerAlert = true;
+              alertDetails = `Best Ask alt sınıra ulaştı. Hedef: ${alarm.threshold}, Güncel: ${askPrice}`;
+              
+              await telegram.sendPriceAlert(alarm.chatId, alarm.title, alarm.outcome, 'ask_below', alarm.threshold, askPrice, alarm.url);
+              db.markAlertSent(alarm.marketId, 'ask_below', alarm.outcome, alarm.threshold, askPrice, alarm.chatId);
             }
           }
         } 
