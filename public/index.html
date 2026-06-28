@@ -4,220 +4,196 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PolyBetPriceTracker - Polymarket Fiyat & Orderbook Alarm Botu</title>
-  <!-- Google Fonts: Outfit & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="glow-bg"></div>
-  
+  <div class="noise-overlay"></div>
+  <div class="glow-orb orb-1"></div>
+  <div class="glow-orb orb-2"></div>
+  <div class="glow-orb orb-3"></div>
+
   <div class="container">
     <!-- Header -->
     <header class="app-header">
       <div class="logo-area">
-        <div class="logo-icon"><i class="fa-solid fa-chart-line-up"></i></div>
+        <div class="logo-icon"><i class="fa-solid fa-bolt"></i></div>
         <div class="logo-text">
-          <h1>PolyBetPrice<span>Tracker</span></h1>
-          <p>Polymarket Insider & Fiyat Takip Otomasyonu</p>
+          <h1>PolyBet<span>Tracker</span></h1>
+          <p class="logo-subtitle">Polymarket Insider & Fiyat Takip</p>
         </div>
       </div>
-      <div class="system-status" id="systemStatus">
-        <span class="status-indicator loading"></span>
-        <span class="status-text">Sistem Kontrol Ediliyor...</span>
+      <div class="header-right">
+        <div class="system-status" id="systemStatus">
+          <span class="status-dot loading"></span>
+          <span class="status-text">Kontrol ediliyor...</span>
+        </div>
       </div>
     </header>
 
-    <div class="dashboard-grid">
-      <!-- Left Column: Alarm Setup -->
-      <div class="glass-card main-setup">
-        <div class="card-header">
-          <div class="header-title">
-            <i class="fa-solid fa-plus-circle icon-purple"></i>
-            <h2>Yeni Alarm Kur</h2>
-          </div>
-          <span class="step-badge">Adım 1</span>
+    <!-- URL Bar - Always visible, prominent -->
+    <div class="url-bar glass-panel">
+      <div class="url-bar-inner">
+        <div class="url-icon"><i class="fa-solid fa-link"></i></div>
+        <input type="text" id="marketUrl" placeholder="Polymarket linkini buraya yapıştır..." autocomplete="off">
+        <button id="resolveBtn" class="resolve-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> <span>Çözümle</span></button>
+      </div>
+    </div>
+
+    <!-- Loader -->
+    <div class="loader-bar hidden" id="resolveLoader">
+      <div class="loader-bar-inner"></div>
+    </div>
+
+    <!-- Main Content Area (Hidden until resolved) -->
+    <div class="main-content hidden" id="step2">
+      <!-- Market Info Bar -->
+      <div class="market-info-bar glass-panel">
+        <div class="market-info-left">
+          <h2 id="resolvedQuestion" class="market-question">Market Başlığı</h2>
+          <div id="marketBadges" class="market-meta"></div>
         </div>
-        
-        <!-- Paste URL input -->
-        <div class="setup-step" id="step1">
-          <label for="marketUrl" class="field-label">Polymarket Bet/Etkinlik Linki</label>
-          <div class="input-group">
-            <input type="text" id="marketUrl" placeholder="https://polymarket.com/event/will-microstrategy-announce..." autocomplete="off">
-            <button id="resolveBtn" class="primary-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> Çözümle</button>
-          </div>
-          <p class="field-help">Polymarket linkini yapıştırdığınızda veriler anında çekilir.</p>
-        </div>
-
-        <!-- Loader -->
-        <div class="loader-container hidden" id="resolveLoader">
-          <div class="spinner"></div>
-          <p>Polymarket verileri CLOB API'den çekiliyor...</p>
-        </div>
-
-        <!-- Step 2: Resolved Market Selection & Visual Orderbook (Hidden initially) -->
-        <div class="setup-step hidden" id="step2">
-          <div class="divider"></div>
-          <div class="step2-layout">
-            <!-- Left Side: Config & Form -->
-            <div class="step2-form-side">
-              <div class="resolved-market-info">
-                <div id="marketBadges" class="market-badges"></div>
-                <h3 id="resolvedQuestion" class="market-title">Market Başlığı</h3>
-                
-                <!-- Market outcomes / select -->
-                <div class="outcome-selection-group">
-                  <label class="field-label">Takip Edilecek Seçenek</label>
-                  <div class="outcome-buttons" id="outcomeButtons">
-                    <!-- Dynamically populated YES / NO buttons -->
-                  </div>
-                </div>
-              </div>
-
-              <!-- Alarm parameters -->
-              <div class="alarm-parameters-section">
-                <div class="form-grid">
-                  <!-- Alarm Type -->
-                  <div class="form-field">
-                    <label for="alarmType" class="field-label">Alarm Türü</label>
-                    <select id="alarmType">
-                      <option value="price_above">Orta Fiyat (Mid Price) Hedefin Üzerine Çıkınca (📈 Mid Above)</option>
-                      <option value="price_below">Orta Fiyat (Mid Price) Hedefin Altına İnince (📉 Mid Below)</option>
-                      <option value="bid_above">En İyi Alış (Best Bid) Hedefin Üzerine Çıkınca (📈 Bid Above)</option>
-                      <option value="ask_below">En İyi Satış (Best Ask) Hedefin Altına İnince (📉 Ask Below)</option>
-                      <option value="wall_created">Büyük Emir Yığılınca / Duvar Eklenince (🐳 Wall Created)</option>
-                      <option value="liquidity_surge">Likidite Kalınlaşması/Patlaması (🌊 Depth Surge)</option>
-                    </select>
-                  </div>
-
-                  <!-- Threshold value -->
-                  <div class="form-field">
-                    <label for="thresholdValue" class="field-label" id="thresholdLabel">Fiyat Limiti ($)</label>
-                    <div class="input-wrapper">
-                      <input type="number" id="thresholdValue" step="0.01" placeholder="0.25">
-                      <span class="input-suffix" id="thresholdSuffix">$</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Telegram Chat Routing -->
-                <div class="form-grid margin-top">
-                  <div class="form-field span-2">
-                    <label for="chatId" class="field-label">Telegram Chat / Grup ID</label>
-                    <div class="input-group">
-                      <input type="text" id="chatId" placeholder="-1001234567890 veya 123456789" value="">
-                      <button id="testTelegramBtn" class="secondary-btn"><i class="fa-solid fa-paper-plane"></i> Test Git</button>
-                    </div>
-                    <p class="field-help">Alarmın gönderileceği Telegram sohbet, grup veya kanal ID'si.</p>
-                  </div>
-                </div>
-
-                <!-- Save Alarm Button -->
-                <button id="saveAlarmBtn" class="glow-btn margin-top-lg"><i class="fa-solid fa-bell"></i> Alarmı Oluştur & Başlat</button>
-              </div>
-            </div>
-
-            <!-- Right Side: Visual Orderbook -->
-            <div class="step2-orderbook-side">
-              <!-- Orderbook Preview container -->
-              <div class="orderbook-preview-section">
-                <div class="orderbook-header">
-                  <div class="ob-title"><i class="fa-solid fa-book-open"></i> Canlı Sipariş Defteri (Orderbook)</div>
-                  <div class="ob-mid-price" id="obMidPrice">Orta Fiyat: --</div>
-                </div>
-                
-                <p class="ob-instruction"><i class="fa-solid fa-circle-info"></i> Bir fiyat seviyesine tıklayarak alarm limitini hızlıca ayarlayabilirsiniz.</p>
-                
-                <div class="orderbook-container">
-                  <!-- Bids Side (Buy orders) -->
-                  <div class="ob-side ob-bids">
-                    <div class="side-header green-text">Alıcılar (Bids)</div>
-                    <div class="ob-list" id="obBidsList">
-                      <div class="ob-empty">Yükleniyor...</div>
-                    </div>
-                  </div>
-                  
-                  <!-- Asks Side (Sell orders) -->
-                  <div class="ob-side ob-asks">
-                    <div class="side-header red-text">Satıcılar (Asks)</div>
-                    <div class="ob-list" id="obAsksList">
-                      <div class="ob-empty">Yükleniyor...</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="market-info-right">
+          <div class="outcome-buttons" id="outcomeButtons"></div>
         </div>
       </div>
 
-      <!-- Right Column: Active Alarms & Log History -->
-      <div class="dashboard-sidebar">
-        <!-- Active Alarms -->
-        <div class="glass-card active-alarms-card">
-          <div class="card-header">
-            <div class="header-title">
-              <i class="fa-solid fa-bell-on icon-green"></i>
-              <h2>Aktif Alarmlar</h2>
-            </div>
-            <span class="count-badge" id="alarmCount">0</span>
+      <!-- Three Column Layout -->
+      <div class="content-grid">
+        <!-- Col 1: Alarm Setup -->
+        <div class="glass-panel alarm-setup-panel">
+          <div class="panel-header">
+            <i class="fa-solid fa-bell panel-icon"></i>
+            <h3>Alarm Kur</h3>
           </div>
-          
-          <div class="alarms-list-container" id="alarmsList">
-            <div class="empty-state">
-              <i class="fa-solid fa-shield-cat"></i>
-              <p>Şu an kurulu bir alarm bulunmuyor.</p>
+
+          <!-- Alarm Type Cards -->
+          <div class="alarm-type-cards" id="alarmTypeCards">
+            <div class="alarm-type-card selected" data-type="bid_above">
+              <div class="atc-icon green-bg"><i class="fa-solid fa-arrow-trend-up"></i></div>
+              <div class="atc-info">
+                <div class="atc-title">Yükselirse Uyar</div>
+                <div class="atc-desc">En iyi alış fiyatı (Best Bid) hedefe ulaşınca</div>
+              </div>
+            </div>
+            <div class="alarm-type-card" data-type="ask_below">
+              <div class="atc-icon red-bg"><i class="fa-solid fa-arrow-trend-down"></i></div>
+              <div class="atc-info">
+                <div class="atc-title">Düşerse Uyar</div>
+                <div class="atc-desc">En iyi satış fiyatı (Best Ask) hedefe düşünce</div>
+              </div>
+            </div>
+            <div class="alarm-type-card" data-type="wall_created">
+              <div class="atc-icon orange-bg"><i class="fa-solid fa-tower-observation"></i></div>
+              <div class="atc-info">
+                <div class="atc-title">Balina / Duvar Tespiti</div>
+                <div class="atc-desc">Büyük emir yığılmasını tespit et</div>
+              </div>
+            </div>
+            <div class="alarm-type-card" data-type="liquidity_surge">
+              <div class="atc-icon cyan-bg"><i class="fa-solid fa-water"></i></div>
+              <div class="atc-info">
+                <div class="atc-title">Likidite Patlaması</div>
+                <div class="atc-desc">Derinlik kalınlaşmasını algıla</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Threshold Input -->
+          <div class="threshold-section">
+            <label class="field-label" id="thresholdLabel">Hedef Fiyat</label>
+            <div class="threshold-input-wrap">
+              <input type="number" id="thresholdValue" step="0.01" placeholder="0.25">
+              <span class="threshold-suffix" id="thresholdSuffix">$</span>
+            </div>
+          </div>
+
+          <!-- Telegram -->
+          <div class="telegram-section">
+            <label class="field-label">Telegram Chat / Grup ID</label>
+            <div class="tg-input-row">
+              <input type="text" id="chatId" placeholder="-1001234567890">
+              <button id="testTelegramBtn" class="test-btn" title="Test mesajı gönder"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+          </div>
+
+          <!-- Save Button -->
+          <button id="saveAlarmBtn" class="save-alarm-btn">
+            <i class="fa-solid fa-bolt"></i> Alarmı Kur
+          </button>
+        </div>
+
+        <!-- Col 2: Orderbook -->
+        <div class="glass-panel orderbook-panel">
+          <div class="panel-header">
+            <i class="fa-solid fa-book-open panel-icon"></i>
+            <h3>Canlı Orderbook</h3>
+            <div class="ob-spread-badge" id="obMidPrice">Spread: --</div>
+          </div>
+          <p class="ob-tip"><i class="fa-solid fa-mouse-pointer"></i> Fiyata tıkla → alarm limiti otomatik dolar</p>
+          <div class="orderbook-grid">
+            <div class="ob-col ob-bids-col">
+              <div class="ob-col-header green-text"><i class="fa-solid fa-arrow-up"></i> Alıcılar (Bids)</div>
+              <div class="ob-list" id="obBidsList">
+                <div class="ob-empty">Yükleniyor...</div>
+              </div>
+            </div>
+            <div class="ob-col ob-asks-col">
+              <div class="ob-col-header red-text"><i class="fa-solid fa-arrow-down"></i> Satıcılar (Asks)</div>
+              <div class="ob-list" id="obAsksList">
+                <div class="ob-empty">Yükleniyor...</div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Telegram Configuration Warning / Instructions -->
-        <div class="glass-card tg-helper-card">
-          <div class="card-header">
-            <div class="header-title">
-              <i class="fa-brands fa-telegram icon-blue"></i>
-              <h2>Telegram Kurulumu</h2>
+        <!-- Col 3: Active Alarms + Logs -->
+        <div class="sidebar-stack">
+          <!-- Active Alarms -->
+          <div class="glass-panel alarms-panel">
+            <div class="panel-header">
+              <i class="fa-solid fa-bell-concierge panel-icon"></i>
+              <h3>Aktif Alarmlar</h3>
+              <span class="alarm-count" id="alarmCount">0</span>
             </div>
-          </div>
-          <div class="card-body">
-            <p>Bildirim almak için Railway'de <code>TELEGRAM_BOT_TOKEN</code> environment variable'ını girmeyi unutmayın.</p>
-            <div class="tg-steps">
-              <div class="tg-step">
-                <span class="num">1</span>
-                <span>Botunuzu grubunuza ekleyin ve <b>Yönetici (Admin)</b> yapın.</span>
-              </div>
-              <div class="tg-step">
-                <span class="num">2</span>
-                <span>Grubunuzun <b>Chat ID</b>'sini öğrenip ilgili alarm alanına girin.</span>
+            <div class="alarms-list" id="alarmsList">
+              <div class="empty-placeholder">
+                <i class="fa-regular fa-bell-slash"></i>
+                <span>Henüz alarm yok</span>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- System Logs -->
-        <div class="glass-card logs-card">
-          <div class="card-header">
-            <div class="header-title">
-              <i class="fa-solid fa-list-timeline icon-orange"></i>
-              <h2>Bildirim & Sistem Günlüğü</h2>
+          <!-- Logs -->
+          <div class="glass-panel logs-panel">
+            <div class="panel-header">
+              <i class="fa-solid fa-terminal panel-icon"></i>
+              <h3>Sistem Logları</h3>
             </div>
-            <button id="clearLogsBtn" class="text-btn" title="Temizle"><i class="fa-solid fa-trash-can"></i></button>
-          </div>
-          <div class="logs-container" id="logsList">
-            <div class="log-item system">Sistem yükleniyor...</div>
+            <div class="logs-list" id="logsList">
+              <div class="log-entry sys">Sistem yükleniyor...</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Telegram Helper (shown when no step2) -->
+    <div class="tg-setup-hint glass-panel" id="tgHint">
+      <i class="fa-brands fa-telegram"></i>
+      <div>
+        <strong>Telegram Kurulumu:</strong> Railway'de <code>TELEGRAM_BOT_TOKEN</code> env'i ekleyin, botu gruba admin yapın, Chat ID'yi alarm kurarken girin.
+      </div>
+    </div>
   </div>
 
-  <!-- Toast Notification -->
+  <!-- Toast -->
   <div class="toast hidden" id="toast">
     <span id="toastIcon"><i class="fa-solid fa-circle-check"></i></span>
-    <span id="toastMessage">İşlem başarıyla tamamlandı.</span>
+    <span id="toastMessage">İşlem başarılı.</span>
   </div>
 
   <script src="app.js"></script>

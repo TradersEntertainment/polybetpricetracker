@@ -1,387 +1,252 @@
-// Global Application State
+// ─── State ───
 let currentMarket = null;
-let currentOutcome = 'yes'; // default
+let currentOutcome = 'yes';
 let currentTokenId = null;
 let orderbookPollInterval = null;
+let selectedAlarmType = 'bid_above'; // Default: yükselirse uyar
 
-// DOM Elements
-const marketUrlInput = document.getElementById('marketUrl');
-const resolveBtn = document.getElementById('resolveBtn');
-const resolveLoader = document.getElementById('resolveLoader');
-const step2Container = document.getElementById('step2');
+// ─── DOM ───
+const $ = id => document.getElementById(id);
+const marketUrlInput = $('marketUrl');
+const resolveBtn = $('resolveBtn');
+const resolveLoader = $('resolveLoader');
+const step2 = $('step2');
+const tgHint = $('tgHint');
+const resolvedQuestion = $('resolvedQuestion');
+const marketBadges = $('marketBadges');
+const outcomeButtons = $('outcomeButtons');
+const obMidPrice = $('obMidPrice');
+const obBidsList = $('obBidsList');
+const obAsksList = $('obAsksList');
+const thresholdValueInput = $('thresholdValue');
+const thresholdLabel = $('thresholdLabel');
+const thresholdSuffix = $('thresholdSuffix');
+const chatIdInput = $('chatId');
+const saveAlarmBtn = $('saveAlarmBtn');
+const testTelegramBtn = $('testTelegramBtn');
+const alarmCountBadge = $('alarmCount');
+const alarmsList = $('alarmsList');
+const logsList = $('logsList');
+const toastEl = $('toast');
+const toastIcon = $('toastIcon');
+const toastMsg = $('toastMessage');
 
-const resolvedQuestion = document.getElementById('resolvedQuestion');
-const marketBadges = document.getElementById('marketBadges');
-const outcomeButtons = document.getElementById('outcomeButtons');
-
-const obMidPrice = document.getElementById('obMidPrice');
-const obBidsList = document.getElementById('obBidsList');
-const obAsksList = document.getElementById('obAsksList');
-
-const alarmTypeSelect = document.getElementById('alarmType');
-const thresholdValueInput = document.getElementById('thresholdValue');
-const thresholdLabel = document.getElementById('thresholdLabel');
-const thresholdSuffix = document.getElementById('thresholdSuffix');
-const chatIdInput = document.getElementById('chatId');
-
-const saveAlarmBtn = document.getElementById('saveAlarmBtn');
-const testTelegramBtn = document.getElementById('testTelegramBtn');
-
-const alarmCountBadge = document.getElementById('alarmCount');
-const alarmsList = document.getElementById('alarmsList');
-const logsList = document.getElementById('logsList');
-const clearLogsBtn = document.getElementById('clearLogsBtn');
-
-const toastElement = document.getElementById('toast');
-const toastIcon = document.getElementById('toastIcon');
-const toastMessage = document.getElementById('toastMessage');
-
-// Event Listeners
+// ─── Init ───
 window.addEventListener('DOMContentLoaded', () => {
-  // Load initial settings
   fetchAlarms();
   fetchLogs();
   fetchSystemStatus();
-  
-  // Set up periodic logs and alarms updates
   setInterval(fetchAlarms, 10000);
   setInterval(fetchLogs, 10000);
   setInterval(fetchSystemStatus, 15000);
 
-  // Auto-fill Chat ID from localStorage if exists
-  const savedChatId = localStorage.getItem('tg_chat_id');
-  if (savedChatId) {
-    chatIdInput.value = savedChatId;
-  }
+  const savedChat = localStorage.getItem('tg_chat_id');
+  if (savedChat) chatIdInput.value = savedChat;
+
+  // Alarm type card clicks
+  document.querySelectorAll('.alarm-type-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.alarm-type-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      selectedAlarmType = card.dataset.type;
+      updateThresholdUI();
+    });
+  });
 });
 
-// Detect paste or direct input on URL
-marketUrlInput.addEventListener('paste', (e) => {
-  // Use setTimeout to let the paste complete and value populate in input
-  setTimeout(() => {
-    handleResolve();
-  }, 100);
-});
-
-marketUrlInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    handleResolve();
-  }
-});
-
+// ─── URL Events ───
+marketUrlInput.addEventListener('paste', () => setTimeout(handleResolve, 100));
+marketUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleResolve(); });
 resolveBtn.addEventListener('click', handleResolve);
 
-// Handle Resolve
+// ─── Resolve Market ───
 async function handleResolve() {
-  const urlOrSlug = marketUrlInput.value.trim();
-  if (!urlOrSlug) {
-    showToast('Lütfen geçerli bir Polymarket linki veya slug girin.', 'error');
-    return;
-  }
+  const url = marketUrlInput.value.trim();
+  if (!url) return showToast('Lütfen Polymarket linki yapıştırın.', 'error');
 
-  // Clear existing polling
-  if (orderbookPollInterval) {
-    clearInterval(orderbookPollInterval);
-    orderbookPollInterval = null;
-  }
-
-  showLoader(true);
-  step2Container.classList.add('hidden');
+  if (orderbookPollInterval) { clearInterval(orderbookPollInterval); orderbookPollInterval = null; }
+  resolveLoader.classList.remove('hidden');
+  step2.classList.add('hidden');
 
   try {
-    const response = await fetch('/api/resolve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urlOrSlug })
+    const res = await fetch('/api/resolve', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urlOrSlug: url })
     });
+    const data = await res.json();
+    if (!data.success || !data.markets?.length) throw new Error(data.error || 'Market bulunamadı.');
 
-    const data = await response.json();
-
-    if (!data.success || !data.markets || data.markets.length === 0) {
-      throw new Error(data.error || 'Market çözümlenemedi.');
-    }
-
-    // Use the first resolved market
     currentMarket = data.markets[0];
-    currentOutcome = 'yes'; // Default to YES
-    
-    // Set initial token ID
-    if (currentMarket.clobTokenIds && currentMarket.clobTokenIds.length > 0) {
-      currentTokenId = currentMarket.clobTokenIds[0]; // YES token ID
-    } else {
-      throw new Error('Market için CLOB token ID\'leri bulunamadı.');
-    }
+    currentOutcome = 'yes';
+    currentTokenId = currentMarket.clobTokenIds?.[0];
+    if (!currentTokenId) throw new Error('Token ID bulunamadı.');
 
-    renderMarketDetails();
+    renderMarketInfo();
     await fetchAndRenderOrderbook();
-    
-    // Set default threshold price to YES price
-    if (currentMarket.prices && currentMarket.prices[0] !== undefined) {
-      thresholdValueInput.value = currentMarket.prices[0].toFixed(2);
-    } else {
-      thresholdValueInput.value = '0.50';
-    }
+    updateThresholdUI();
 
-    // Set up polling for orderbook (every 5 seconds while editing/viewing)
     orderbookPollInterval = setInterval(fetchAndRenderOrderbook, 5000);
-
-    showLoader(false);
-    step2Container.classList.remove('hidden');
-    showToast('Market başarıyla çözümlendi!', 'success');
+    resolveLoader.classList.add('hidden');
+    step2.classList.remove('hidden');
+    if (tgHint) tgHint.classList.add('hidden');
+    showToast('Market çözümlendi!', 'success');
   } catch (err) {
-    showLoader(false);
+    resolveLoader.classList.add('hidden');
     showToast(err.message, 'error');
   }
 }
 
-// Render Resolved Market Details
-function renderMarketDetails() {
+// ─── Market Info ───
+function renderMarketInfo() {
   resolvedQuestion.textContent = currentMarket.question;
-  
-  // Render badges
+  const vol = Math.round(currentMarket.volume).toLocaleString();
+  const liq = Math.round(currentMarket.liquidity).toLocaleString();
   marketBadges.innerHTML = `
-    <span class="badge purple-badge">Slug: ${currentMarket.slug}</span>
-    <span class="badge">Hacim: $${Math.round(currentMarket.volume).toLocaleString()}</span>
-    <span class="badge">Likidite: $${Math.round(currentMarket.liquidity).toLocaleString()}</span>
+    <span class="meta-tag accent">${currentMarket.slug}</span>
+    <span class="meta-tag">Hacim: $${vol}</span>
+    <span class="meta-tag">Likidite: $${liq}</span>
   `;
 
-  // Render YES / NO outcome selection buttons
-  const prices = currentMarket.prices || [0.5, 0.5];
-  const yesPrice = prices[0] ? prices[0].toFixed(2) : '--';
-  const noPrice = prices[1] ? prices[1].toFixed(2) : '--';
-
+  const p = currentMarket.prices || [0.5, 0.5];
   outcomeButtons.innerHTML = `
     <button type="button" class="outcome-btn active" data-outcome="yes">
-      <span>YES (Evet)</span>
-      <span class="outcome-price">${yesPrice}$</span>
+      YES <span class="price-tag">${p[0]?.toFixed(2) || '--'}$</span>
     </button>
     <button type="button" class="outcome-btn" data-outcome="no">
-      <span>NO (Hayır)</span>
-      <span class="outcome-price">${noPrice}$</span>
+      NO <span class="price-tag">${p[1]?.toFixed(2) || '--'}$</span>
     </button>
   `;
 
-  // Handle outcome selection switch
-  const buttons = outcomeButtons.querySelectorAll('.outcome-btn');
-  buttons.forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const selectedOutcome = btn.getAttribute('data-outcome');
-      if (selectedOutcome === currentOutcome) return;
-
-      buttons.forEach(b => b.classList.remove('active'));
+  outcomeButtons.querySelectorAll('.outcome-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const oc = btn.dataset.outcome;
+      if (oc === currentOutcome) return;
+      outcomeButtons.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      
-      currentOutcome = selectedOutcome;
-      
-      if (currentOutcome === 'yes') {
-        currentTokenId = currentMarket.clobTokenIds[0];
-        if (currentMarket.prices && currentMarket.prices[0] !== undefined) {
-          thresholdValueInput.value = currentMarket.prices[0].toFixed(2);
-        }
-      } else {
-        currentTokenId = currentMarket.clobTokenIds[1];
-        if (currentMarket.prices && currentMarket.prices[1] !== undefined) {
-          thresholdValueInput.value = currentMarket.prices[1].toFixed(2);
-        }
-      }
-
-      showToast(`${currentOutcome.toUpperCase()} seçeneği seçildi.`, 'info');
-      
-      // Immediately fetch new orderbook
+      currentOutcome = oc;
+      currentTokenId = currentMarket.clobTokenIds[oc === 'yes' ? 0 : 1];
+      updateThresholdUI();
       await fetchAndRenderOrderbook();
     });
   });
 }
 
-// Fetch and Render Orderbook
-async function fetchAndRenderOrderbook() {
-  if (!currentTokenId) return;
-
-  try {
-    const response = await fetch('/api/orderbook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tokenId: currentTokenId })
-    });
-
-    const data = await response.json();
-    if (!data.success || !data.book) {
-      throw new Error(data.error || 'Sipariş defteri yüklenemedi.');
-    }
-
-    renderOrderbook(data.book);
-  } catch (err) {
-    console.error('Orderbook error:', err.message);
-    obBidsList.innerHTML = `<div class="ob-empty">Hata: ${err.message}</div>`;
-    obAsksList.innerHTML = `<div class="ob-empty">Hata: ${err.message}</div>`;
-  }
-}
-
-// Render Orderbook inside Bids and Asks lists
-function renderOrderbook(book) {
-  const bids = book.bids || [];
-  const asks = book.asks || [];
-  const midPrice = book.midPrice || '--';
-  
-  obMidPrice.textContent = `Orta Fiyat: ${midPrice}$`;
-
-  // Find max size to calculate relative percentage bar
-  const allSizes = [...bids.map(b => b.size), ...asks.map(a => a.size)];
-  const maxSize = allSizes.length > 0 ? Math.max(...allSizes) : 1;
-
-  const wallSharesThreshold = getWallThresholdShares();
-
-  // 1. Render Bids (Buy orders)
-  if (bids.length === 0) {
-    obBidsList.innerHTML = '<div class="ob-empty">Alış emri yok</div>';
-  } else {
-    obBidsList.innerHTML = bids.slice(0, 15).map(bid => {
-      const percentage = (bid.size / maxSize) * 100;
-      const isWall = bid.size >= wallSharesThreshold;
-      const wallClass = isWall ? 'has-wall' : '';
-      const wallIcon = isWall ? '<i class="fa-solid fa-whale"></i> ' : '';
-
-      return `
-        <div class="ob-row ${wallClass}" data-price="${bid.price.toFixed(2)}">
-          <div class="ob-row-bar" style="width: ${percentage}%"></div>
-          <span class="ob-row-price">${bid.price.toFixed(2)}$</span>
-          <span class="ob-row-size">${wallIcon}${Math.round(bid.size).toLocaleString()}</span>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // 2. Render Asks (Sell orders)
-  if (asks.length === 0) {
-    obAsksList.innerHTML = '<div class="ob-empty">Satış emri yok</div>';
-  } else {
-    obAsksList.innerHTML = asks.slice(0, 15).map(ask => {
-      const percentage = (ask.size / maxSize) * 100;
-      const isWall = ask.size >= wallSharesThreshold;
-      const wallClass = isWall ? 'has-wall' : '';
-      const wallIcon = isWall ? '<i class="fa-solid fa-whale"></i> ' : '';
-
-      return `
-        <div class="ob-row ${wallClass}" data-price="${ask.price.toFixed(2)}">
-          <div class="ob-row-bar" style="width: ${percentage}%"></div>
-          <span class="ob-row-price">${ask.price.toFixed(2)}$</span>
-          <span class="ob-row-size">${wallIcon}${Math.round(ask.size).toLocaleString()}</span>
-        </div>
-      `;
-    }).join('');
-  }
-
-  // Click handler to pre-fill threshold limit input
-  const obRows = document.querySelectorAll('.ob-row');
-  obRows.forEach(row => {
-    row.addEventListener('click', () => {
-      const price = row.getAttribute('data-price');
-      thresholdValueInput.value = price;
-      
-      // Flash threshold input green to show interaction
-      thresholdValueInput.style.borderColor = 'var(--green)';
-      thresholdValueInput.style.boxShadow = '0 0 10px rgba(16, 185, 129, 0.3)';
-      setTimeout(() => {
-        thresholdValueInput.style.borderColor = 'var(--purple)';
-        thresholdValueInput.style.boxShadow = 'none';
-      }, 1000);
-
-      showToast(`Alarm fiyat hedefi ${price}$ olarak güncellendi.`, 'info');
-    });
-  });
-}
-
-// Adjust labels and values depending on alarm type selection
-alarmTypeSelect.addEventListener('change', () => {
-  const type = alarmTypeSelect.value;
-  
-  if (type === 'price_above' || type === 'price_below' || type === 'bid_above' || type === 'ask_below') {
-    thresholdLabel.textContent = 'Fiyat Limiti ($)';
+// ─── Threshold UI by alarm type ───
+function updateThresholdUI() {
+  const t = selectedAlarmType;
+  if (t === 'bid_above' || t === 'ask_below' || t === 'price_above' || t === 'price_below') {
+    thresholdLabel.textContent = 'Hedef Fiyat';
     thresholdSuffix.textContent = '$';
     thresholdValueInput.step = '0.01';
     thresholdValueInput.placeholder = '0.25';
-    // Reset to current option price
     const idx = currentOutcome === 'yes' ? 0 : 1;
-    if (currentMarket && currentMarket.prices && currentMarket.prices[idx] !== undefined) {
+    if (currentMarket?.prices?.[idx] !== undefined) {
       thresholdValueInput.value = currentMarket.prices[idx].toFixed(2);
     }
-  } 
-  else if (type === 'wall_created') {
-    thresholdLabel.textContent = 'Minimum Duvar Boyutu (Shares)';
+  } else if (t === 'wall_created') {
+    thresholdLabel.textContent = 'Minimum Duvar Boyutu';
     thresholdSuffix.textContent = 'Adet';
     thresholdValueInput.step = '1000';
     thresholdValueInput.value = '5000';
     thresholdValueInput.placeholder = '5000';
-  } 
-  else if (type === 'liquidity_surge') {
-    thresholdLabel.textContent = 'Kalınlaşma Oranı (%)';
+  } else if (t === 'liquidity_surge') {
+    thresholdLabel.textContent = 'Kalınlaşma Oranı';
     thresholdSuffix.textContent = '%';
     thresholdValueInput.step = '5';
     thresholdValueInput.value = '50';
     thresholdValueInput.placeholder = '50';
   }
-});
+}
 
-// Create Alarm
-saveAlarmBtn.addEventListener('click', async () => {
-  if (!currentMarket || !currentTokenId) {
-    showToast('Öncelikle bir Polymarket linki çözümlemelisiniz.', 'error');
-    return;
+// ─── Orderbook ───
+async function fetchAndRenderOrderbook() {
+  if (!currentTokenId) return;
+  try {
+    const res = await fetch('/api/orderbook', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tokenId: currentTokenId })
+    });
+    const data = await res.json();
+    if (!data.success || !data.book) throw new Error(data.error || 'Orderbook yüklenemedi.');
+    renderOrderbook(data.book);
+  } catch (err) {
+    obBidsList.innerHTML = `<div class="ob-empty">Hata: ${err.message}</div>`;
+    obAsksList.innerHTML = `<div class="ob-empty">Hata: ${err.message}</div>`;
   }
+}
 
+function renderOrderbook(book) {
+  const bids = book.bids || [];
+  const asks = book.asks || [];
+  const spread = book.spread !== null ? book.spread.toFixed(2) : '--';
+  const mid = book.midPrice || '--';
+  obMidPrice.textContent = `Mid: ${mid}$ | Spread: ${spread}$`;
+
+  const allSizes = [...bids.map(b => b.size), ...asks.map(a => a.size)];
+  const maxSize = allSizes.length > 0 ? Math.max(...allSizes) : 1;
+  const wallThreshold = getWallThreshold();
+
+  obBidsList.innerHTML = bids.length === 0 ? '<div class="ob-empty">Alış emri yok</div>' :
+    bids.slice(0, 20).map(b => obRowHtml(b, maxSize, wallThreshold)).join('');
+
+  obAsksList.innerHTML = asks.length === 0 ? '<div class="ob-empty">Satış emri yok</div>' :
+    asks.slice(0, 20).map(a => obRowHtml(a, maxSize, wallThreshold)).join('');
+
+  // Click to fill threshold
+  document.querySelectorAll('.ob-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const p = row.dataset.price;
+      thresholdValueInput.value = p;
+      thresholdValueInput.style.borderColor = 'var(--green)';
+      thresholdValueInput.style.boxShadow = '0 0 12px rgba(34,197,94,0.25)';
+      setTimeout(() => { thresholdValueInput.style.borderColor = ''; thresholdValueInput.style.boxShadow = ''; }, 800);
+      showToast(`Hedef: ${p}$`, 'info');
+    });
+  });
+}
+
+function obRowHtml(level, maxSize, wallThreshold) {
+  const pct = (level.size / maxSize) * 100;
+  const isWall = level.size >= wallThreshold;
+  return `<div class="ob-row ${isWall ? 'wall' : ''}" data-price="${level.price.toFixed(2)}">
+    <div class="ob-row-bar" style="width:${pct}%"></div>
+    <span class="ob-row-price">${level.price.toFixed(2)}$</span>
+    <span class="ob-row-size">${isWall ? '🐳 ' : ''}${Math.round(level.size).toLocaleString()}</span>
+  </div>`;
+}
+
+function getWallThreshold() {
+  if (selectedAlarmType === 'wall_created') {
+    const v = Number(thresholdValueInput.value);
+    if (!isNaN(v) && v > 0) return v;
+  }
+  return 5000;
+}
+
+// ─── Save Alarm ───
+saveAlarmBtn.addEventListener('click', async () => {
+  if (!currentMarket || !currentTokenId) return showToast('Önce bir market çözümleyin.', 'error');
   const threshold = Number(thresholdValueInput.value);
   const chatId = chatIdInput.value.trim();
+  if (isNaN(threshold) || threshold <= 0) return showToast('Geçerli bir limit girin.', 'error');
+  if (!chatId) return showToast('Telegram Chat ID girin.', 'error');
 
-  if (isNaN(threshold) || threshold <= 0) {
-    showToast('Lütfen geçerli bir limit değeri girin.', 'error');
-    return;
-  }
-
-  if (!chatId) {
-    showToast('Lütfen bildirimlerin iletileceği Telegram Chat ID\'sini girin.', 'error');
-    return;
-  }
-
-  // Save Chat ID to localStorage for convenience
   localStorage.setItem('tg_chat_id', chatId);
 
-  const payload = {
-    url: currentMarket.originalUrl,
-    slug: currentMarket.slug,
-    marketId: currentMarket.marketId,
-    title: currentMarket.question,
-    outcome: currentOutcome,
-    tokenId: currentTokenId,
-    alarmType: alarmTypeSelect.value,
-    threshold,
-    chatId
-  };
-
   try {
-    const response = await fetch('/api/alarms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    const res = await fetch('/api/alarms', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: currentMarket.originalUrl, slug: currentMarket.slug,
+        marketId: currentMarket.marketId, title: currentMarket.question,
+        outcome: currentOutcome, tokenId: currentTokenId,
+        alarmType: selectedAlarmType, threshold, chatId
+      })
     });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
 
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    showToast('Alarm başarıyla kuruldu ve arka planda çalıştırıldı!', 'success');
-    
-    // Clear inputs and state
-    marketUrlInput.value = '';
-    step2Container.classList.add('hidden');
-    currentMarket = null;
-    currentTokenId = null;
-    if (orderbookPollInterval) {
-      clearInterval(orderbookPollInterval);
-      orderbookPollInterval = null;
-    }
-
-    // Refresh alarms list
+    showToast('Alarm kuruldu!', 'success');
     fetchAlarms();
     fetchLogs();
   } catch (err) {
@@ -389,239 +254,130 @@ saveAlarmBtn.addEventListener('click', async () => {
   }
 });
 
-// Test Telegram Button
+// ─── Test Telegram ───
 testTelegramBtn.addEventListener('click', async () => {
   const chatId = chatIdInput.value.trim();
-  if (!chatId) {
-    showToast('Test etmek için bir Telegram Chat ID girin.', 'error');
-    return;
-  }
-
-  // Save to storage
+  if (!chatId) return showToast('Chat ID girin.', 'error');
   localStorage.setItem('tg_chat_id', chatId);
-
   try {
-    const response = await fetch('/api/test-telegram', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch('/api/test-telegram', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chatId })
     });
-
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    showToast('Telegram test mesajı gönderildi! Grubunuzu kontrol edin.', 'success');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Test mesajı gönderildi!', 'success');
     fetchLogs();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
+  } catch (err) { showToast(err.message, 'error'); }
 });
 
-// Helper to determine wall size threshold based on input
-function getWallThresholdShares() {
-  if (alarmTypeSelect.value === 'wall_created') {
-    const inputVal = Number(thresholdValueInput.value);
-    if (!isNaN(inputVal) && inputVal > 0) return inputVal;
-  }
-  return 5000; // Default 5000 shares
-}
-
-// Fetch and Render Alarms List
+// ─── Alarms List ───
 async function fetchAlarms() {
   try {
-    const response = await fetch('/api/alarms');
-    const alarms = await response.json();
-
+    const res = await fetch('/api/alarms');
+    const alarms = await res.json();
     alarmCountBadge.textContent = alarms.length;
 
-    if (alarms.length === 0) {
-      alarmsList.innerHTML = `
-        <div class="empty-state">
-          <i class="fa-solid fa-shield-cat"></i>
-          <p>Şu an kurulu bir alarm bulunmuyor.</p>
-        </div>
-      `;
+    if (!alarms.length) {
+      alarmsList.innerHTML = `<div class="empty-placeholder"><i class="fa-regular fa-bell-slash"></i><span>Henüz alarm yok</span></div>`;
       return;
     }
 
-    alarmsList.innerHTML = alarms.map(alarm => {
-      const statusClass = alarm.active ? 'active' : 'inactive';
-      const statusIcon = alarm.active ? 'fa-bell-slash' : 'fa-bell';
-      const statusTitle = alarm.active ? 'Pasifleştir' : 'Aktifleştir';
-      
-      let typeText = '';
-      let targetSuffix = '';
-      
-      switch (alarm.alarmType) {
-        case 'price_above':
-          typeText = 'Orta Fiyat Üzeri 📈';
-          targetSuffix = '$';
-          break;
-        case 'price_below':
-          typeText = 'Orta Fiyat Altı 📉';
-          targetSuffix = '$';
-          break;
-        case 'bid_above':
-          typeText = 'Best Bid Üzeri 📈';
-          targetSuffix = '$';
-          break;
-        case 'ask_below':
-          typeText = 'Best Ask Altı 📉';
-          targetSuffix = '$';
-          break;
-        case 'wall_created':
-          typeText = 'Yeni Duvar 🐳';
-          targetSuffix = ' Adet';
-          break;
-        case 'liquidity_surge':
-          typeText = 'Likidite Artış 🌊';
-          targetSuffix = '%';
-          break;
+    alarmsList.innerHTML = alarms.map(a => {
+      const cls = a.active ? '' : 'inactive';
+      const togIcon = a.active ? 'fa-pause' : 'fa-play';
+      let kind = '', suffix = '';
+      switch (a.alarmType) {
+        case 'bid_above': kind = 'Yükselirse 📈'; suffix = '$'; break;
+        case 'ask_below': kind = 'Düşerse 📉'; suffix = '$'; break;
+        case 'price_above': kind = 'Mid Üzeri 📈'; suffix = '$'; break;
+        case 'price_below': kind = 'Mid Altı 📉'; suffix = '$'; break;
+        case 'wall_created': kind = 'Duvar 🐳'; suffix = ' Adet'; break;
+        case 'liquidity_surge': kind = 'Likidite 🌊'; suffix = '%'; break;
       }
-
-      return `
-        <div class="alarm-card ${statusClass}">
-          <div class="alarm-card-header">
-            <div class="alarm-card-title">${alarm.title}</div>
-            <div class="alarm-card-actions">
-              <button class="alarm-action-btn toggle-btn" onclick="toggleAlarm('${alarm.id}')" title="${statusTitle}">
-                <i class="fa-solid ${statusIcon}"></i>
-              </button>
-              <button class="alarm-action-btn delete-btn" onclick="deleteAlarm('${alarm.id}')" title="Sil">
-                <i class="fa-solid fa-trash-can"></i>
-              </button>
-            </div>
-          </div>
-          <div class="alarm-card-body">
-            <span class="alarm-badge ${alarm.outcome}">${alarm.outcome.toUpperCase()}</span>
-            <span class="alarm-badge type">${typeText}</span>
-            <span class="alarm-badge target">Hedef: ${alarm.threshold}${targetSuffix}</span>
-          </div>
-          <div class="alarm-card-footer">
-            <span><i class="fa-brands fa-telegram"></i> ID: ${alarm.chatId}</span>
-            <span><i class="fa-solid fa-clock"></i> ${new Date(alarm.createdAt).toLocaleDateString('tr-TR')}</span>
+      return `<div class="alarm-item ${cls}">
+        <div class="alarm-item-top">
+          <div class="alarm-item-title" title="${a.title}">${a.title}</div>
+          <div class="alarm-item-actions">
+            <button onclick="toggleAlarm('${a.id}')" title="${a.active ? 'Durdur' : 'Başlat'}"><i class="fa-solid ${togIcon}"></i></button>
+            <button class="del" onclick="deleteAlarm('${a.id}')" title="Sil"><i class="fa-solid fa-trash"></i></button>
           </div>
         </div>
-      `;
+        <div class="alarm-item-tags">
+          <span class="atag ${a.outcome}">${a.outcome.toUpperCase()}</span>
+          <span class="atag kind">${kind}</span>
+          <span class="atag target">${a.threshold}${suffix}</span>
+        </div>
+      </div>`;
     }).join('');
-  } catch (err) {
-    console.error('Error fetching alarms:', err.message);
-  }
+  } catch (err) { console.error('Alarms fetch error:', err); }
 }
 
-// Global actions called from HTML onClick
-window.deleteAlarm = async function(id) {
-  if (!confirm('Bu alarmı silmek istediğinize emin misiniz?')) return;
-
+window.deleteAlarm = async id => {
+  if (!confirm('Alarm silinsin mi?')) return;
   try {
-    const response = await fetch(`/api/alarms/${id}`, { method: 'DELETE' });
-    const data = await response.json();
-    if (data.error) throw new Error(data.error);
-
+    const res = await fetch(`/api/alarms/${id}`, { method: 'DELETE' });
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
     showToast('Alarm silindi.', 'success');
-    fetchAlarms();
-    fetchLogs();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
+    fetchAlarms(); fetchLogs();
+  } catch (e) { showToast(e.message, 'error'); }
 };
 
-window.toggleAlarm = async function(id) {
+window.toggleAlarm = async id => {
   try {
-    const response = await fetch(`/api/alarms/${id}/toggle`, { method: 'POST' });
-    const data = await response.json();
-    if (data.error) throw new Error(data.error);
-
-    showToast(`Alarm ${data.active ? 'aktifleştirildi' : 'pasifleştirildi'}.`, 'success');
-    fetchAlarms();
-    fetchLogs();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
+    const res = await fetch(`/api/alarms/${id}/toggle`, { method: 'POST' });
+    const d = await res.json();
+    if (d.error) throw new Error(d.error);
+    showToast(`Alarm ${d.active ? 'başlatıldı' : 'durduruldu'}.`, 'success');
+    fetchAlarms(); fetchLogs();
+  } catch (e) { showToast(e.message, 'error'); }
 };
 
-// Fetch and Render Log history
+// ─── Logs ───
 async function fetchLogs() {
   try {
-    const response = await fetch('/api/logs');
-    const logs = await response.json();
-
-    if (logs.length === 0) {
-      logsList.innerHTML = '<div class="ob-empty">Kayıtlı bildirim yok.</div>';
-      return;
-    }
-
-    logsList.innerHTML = logs.map(log => {
-      let typeClass = 'system';
-      if (log.message.includes('[ALARM TETİKLENDİ]')) {
-        typeClass = 'alert';
-      } else if (log.message.includes('Hata') || log.message.includes('Failed')) {
-        typeClass = 'error';
-      }
-
-      const time = new Date(log.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      return `
-        <div class="log-item ${typeClass}">
-          <span class="time">${time}</span> ${log.message}
-        </div>
-      `;
+    const res = await fetch('/api/logs');
+    const logs = await res.json();
+    if (!logs.length) { logsList.innerHTML = '<div class="ob-empty">Log yok.</div>'; return; }
+    logsList.innerHTML = logs.slice(0, 30).map(l => {
+      let cls = 'sys';
+      if (l.message.includes('[ALARM TETİKLENDİ]')) cls = 'alert';
+      else if (l.message.includes('Hata')) cls = 'err';
+      const t = new Date(l.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return `<div class="log-entry ${cls}"><span class="ts">${t}</span> ${l.message}</div>`;
     }).join('');
-  } catch (err) {
-    console.error('Error fetching logs:', err.message);
-  }
+  } catch (e) { console.error('Logs error:', e); }
 }
 
-// Fetch System Status
+// ─── System Status ───
 async function fetchSystemStatus() {
   try {
-    const response = await fetch('/api/status');
-    const status = await response.json();
-    
-    const indicator = document.getElementById('systemStatus').querySelector('.status-indicator');
-    const statusText = document.getElementById('systemStatus').querySelector('.status-text');
-
-    if (status.telegramConfigured) {
-      indicator.className = 'status-indicator online';
-      statusText.textContent = `Bot Aktif (${status.activeAlarmsCount} Takip)`;
+    const res = await fetch('/api/status');
+    const s = await res.json();
+    const dot = $('systemStatus').querySelector('.status-dot');
+    const txt = $('systemStatus').querySelector('.status-text');
+    if (s.telegramConfigured) {
+      dot.className = 'status-dot online';
+      txt.textContent = `Aktif (${s.activeAlarmsCount} takip)`;
     } else {
-      indicator.className = 'status-indicator offline';
-      statusText.textContent = 'Token Eksik (Railway Env)';
+      dot.className = 'status-dot offline';
+      txt.textContent = 'Token eksik';
     }
-  } catch (err) {
-    const indicator = document.getElementById('systemStatus').querySelector('.status-indicator');
-    const statusText = document.getElementById('systemStatus').querySelector('.status-text');
-    indicator.className = 'status-indicator offline';
-    statusText.textContent = 'Server Bağlantı Hatası';
+  } catch {
+    const dot = $('systemStatus').querySelector('.status-dot');
+    const txt = $('systemStatus').querySelector('.status-text');
+    dot.className = 'status-dot offline';
+    txt.textContent = 'Bağlantı yok';
   }
 }
 
-// UI Helpers
-function showLoader(visible) {
-  if (visible) {
-    resolveLoader.classList.remove('hidden');
-  } else {
-    resolveLoader.classList.add('hidden');
-  }
-}
-
-function showToast(message, type = 'success') {
-  toastMessage.textContent = message;
-  toastElement.className = `toast ${type}`;
-  
-  let iconHtml = '<i class="fa-solid fa-circle-check"></i>';
-  if (type === 'error') {
-    iconHtml = '<i class="fa-solid fa-triangle-exclamation"></i>';
-  } else if (type === 'info') {
-    iconHtml = '<i class="fa-solid fa-info-circle"></i>';
-  }
-  toastIcon.innerHTML = iconHtml;
-
-  toastElement.classList.remove('hidden');
-
-  // Auto-hide after 3 seconds
-  setTimeout(() => {
-    toastElement.classList.add('hidden');
-  }, 4000);
+// ─── Toast ───
+function showToast(msg, type = 'success') {
+  toastMsg.textContent = msg;
+  toastEl.className = `toast ${type}`;
+  const icons = { success: 'fa-circle-check', error: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+  toastIcon.innerHTML = `<i class="fa-solid ${icons[type] || icons.success}"></i>`;
+  toastEl.classList.remove('hidden');
+  setTimeout(() => toastEl.classList.add('hidden'), 3500);
 }
