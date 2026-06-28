@@ -61,86 +61,93 @@
         <!-- Step 2: Resolved Market Selection & Visual Orderbook (Hidden initially) -->
         <div class="setup-step hidden" id="step2">
           <div class="divider"></div>
-          <div class="resolved-market-info">
-            <div id="marketBadges" class="market-badges"></div>
-            <h3 id="resolvedQuestion" class="market-title">Market Başlığı</h3>
-            
-            <!-- Market outcomes / select -->
-            <div class="outcome-selection-group">
-              <label class="field-label">Takip Edilecek Seçenek</label>
-              <div class="outcome-buttons" id="outcomeButtons">
-                <!-- Dynamically populated YES / NO buttons -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Orderbook Preview container -->
-          <div class="orderbook-preview-section">
-            <div class="orderbook-header">
-              <div class="ob-title"><i class="fa-solid fa-book-open"></i> Canlı Sipariş Defteri (Orderbook)</div>
-              <div class="ob-mid-price" id="obMidPrice">Orta Fiyat: --</div>
-            </div>
-            
-            <p class="ob-instruction"><i class="fa-solid fa-circle-info"></i> Bir fiyat seviyesine tıklayarak alarm limitini hızlıca ayarlayabilirsiniz.</p>
-            
-            <div class="orderbook-container">
-              <!-- Bids Side (Buy orders) -->
-              <div class="ob-side ob-bids">
-                <div class="side-header green-text">Alıcılar (Bids)</div>
-                <div class="ob-list" id="obBidsList">
-                  <div class="ob-empty">Yükleniyor...</div>
+          <div class="step2-layout">
+            <!-- Left Side: Config & Form -->
+            <div class="step2-form-side">
+              <div class="resolved-market-info">
+                <div id="marketBadges" class="market-badges"></div>
+                <h3 id="resolvedQuestion" class="market-title">Market Başlığı</h3>
+                
+                <!-- Market outcomes / select -->
+                <div class="outcome-selection-group">
+                  <label class="field-label">Takip Edilecek Seçenek</label>
+                  <div class="outcome-buttons" id="outcomeButtons">
+                    <!-- Dynamically populated YES / NO buttons -->
+                  </div>
                 </div>
               </div>
-              
-              <!-- Asks Side (Sell orders) -->
-              <div class="ob-side ob-asks">
-                <div class="side-header red-text">Satıcılar (Asks)</div>
-                <div class="ob-list" id="obAsksList">
-                  <div class="ob-empty">Yükleniyor...</div>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Step 3: Alarm parameters -->
-          <div class="divider"></div>
-          <div class="alarm-parameters-section">
-            <div class="form-grid">
-              <!-- Alarm Type -->
-              <div class="form-field">
-                <label for="alarmType" class="field-label">Alarm Türü</label>
-                <select id="alarmType">
-                  <option value="price_above">Fiyat Hedefin Üzerine Çıkınca (📈 Price Above)</option>
-                  <option value="price_below">Fiyat Hedefin Altına İnince (📉 Price Below)</option>
-                  <option value="wall_created">Büyük Emir Yığılınca / Duvar Eklenince (🐳 Wall Created)</option>
-                  <option value="liquidity_surge">Likidite Kalınlaşması/Patlaması (🌊 Depth Surge)</option>
-                </select>
-              </div>
+              <!-- Alarm parameters -->
+              <div class="alarm-parameters-section">
+                <div class="form-grid">
+                  <!-- Alarm Type -->
+                  <div class="form-field">
+                    <label for="alarmType" class="field-label">Alarm Türü</label>
+                    <select id="alarmType">
+                      <option value="price_above">Fiyat Hedefin Üzerine Çıkınca (📈 Price Above)</option>
+                      <option value="price_below">Fiyat Hedefin Altına İnince (📉 Price Below)</option>
+                      <option value="wall_created">Büyük Emir Yığılınca / Duvar Eklenince (🐳 Wall Created)</option>
+                      <option value="liquidity_surge">Likidite Kalınlaşması/Patlaması (🌊 Depth Surge)</option>
+                    </select>
+                  </div>
 
-              <!-- Threshold value -->
-              <div class="form-field">
-                <label for="thresholdValue" class="field-label" id="thresholdLabel">Fiyat Limiti ($)</label>
-                <div class="input-wrapper">
-                  <input type="number" id="thresholdValue" step="0.01" placeholder="0.25">
-                  <span class="input-suffix" id="thresholdSuffix">$</span>
+                  <!-- Threshold value -->
+                  <div class="form-field">
+                    <label for="thresholdValue" class="field-label" id="thresholdLabel">Fiyat Limiti ($)</label>
+                    <div class="input-wrapper">
+                      <input type="number" id="thresholdValue" step="0.01" placeholder="0.25">
+                      <span class="input-suffix" id="thresholdSuffix">$</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <!-- Telegram Chat Routing -->
-            <div class="form-grid margin-top">
-              <div class="form-field span-2">
-                <label for="chatId" class="field-label">Telegram Chat / Grup ID</label>
-                <div class="input-group">
-                  <input type="text" id="chatId" placeholder="-1001234567890 veya 123456789" value="">
-                  <button id="testTelegramBtn" class="secondary-btn"><i class="fa-solid fa-paper-plane"></i> Test Git</button>
+                <!-- Telegram Chat Routing -->
+                <div class="form-grid margin-top">
+                  <div class="form-field span-2">
+                    <label for="chatId" class="field-label">Telegram Chat / Grup ID</label>
+                    <div class="input-group">
+                      <input type="text" id="chatId" placeholder="-1001234567890 veya 123456789" value="">
+                      <button id="testTelegramBtn" class="secondary-btn"><i class="fa-solid fa-paper-plane"></i> Test Git</button>
+                    </div>
+                    <p class="field-help">Alarmın gönderileceği Telegram sohbet, grup veya kanal ID'si.</p>
+                  </div>
                 </div>
-                <p class="field-help">Alarmın gönderileceği Telegram sohbet, grup veya kanal ID'si.</p>
+
+                <!-- Save Alarm Button -->
+                <button id="saveAlarmBtn" class="glow-btn margin-top-lg"><i class="fa-solid fa-bell"></i> Alarmı Oluştur & Başlat</button>
               </div>
             </div>
 
-            <!-- Save Alarm Button -->
-            <button id="saveAlarmBtn" class="glow-btn margin-top-lg"><i class="fa-solid fa-bell"></i> Alarmı Oluştur & Başlat</button>
+            <!-- Right Side: Visual Orderbook -->
+            <div class="step2-orderbook-side">
+              <!-- Orderbook Preview container -->
+              <div class="orderbook-preview-section">
+                <div class="orderbook-header">
+                  <div class="ob-title"><i class="fa-solid fa-book-open"></i> Canlı Sipariş Defteri (Orderbook)</div>
+                  <div class="ob-mid-price" id="obMidPrice">Orta Fiyat: --</div>
+                </div>
+                
+                <p class="ob-instruction"><i class="fa-solid fa-circle-info"></i> Bir fiyat seviyesine tıklayarak alarm limitini hızlıca ayarlayabilirsiniz.</p>
+                
+                <div class="orderbook-container">
+                  <!-- Bids Side (Buy orders) -->
+                  <div class="ob-side ob-bids">
+                    <div class="side-header green-text">Alıcılar (Bids)</div>
+                    <div class="ob-list" id="obBidsList">
+                      <div class="ob-empty">Yükleniyor...</div>
+                    </div>
+                  </div>
+                  
+                  <!-- Asks Side (Sell orders) -->
+                  <div class="ob-side ob-asks">
+                    <div class="side-header red-text">Satıcılar (Asks)</div>
+                    <div class="ob-list" id="obAsksList">
+                      <div class="ob-empty">Yükleniyor...</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
