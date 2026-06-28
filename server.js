@@ -10,6 +10,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const DEFAULT_CHAT_ID = '-5581160915';
 
 app.use(cors());
 app.use(express.json());
@@ -49,7 +50,10 @@ app.post('/api/alarms', (req, res) => {
       chatId
     } = req.body;
 
-    if (!url || !slug || !marketId || !title || !outcome || !tokenId || !alarmType || threshold === undefined || !chatId) {
+    // Use default chat ID if none provided
+    const resolvedChatId = (chatId && chatId.trim()) ? chatId.trim() : DEFAULT_CHAT_ID;
+
+    if (!url || !slug || !marketId || !title || !outcome || !tokenId || !alarmType || threshold === undefined) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
@@ -62,7 +66,7 @@ app.post('/api/alarms', (req, res) => {
       tokenId,
       alarmType,
       threshold: Number(threshold),
-      chatId: chatId.trim()
+      chatId: resolvedChatId
     });
 
     db.addLog(`Yeni alarm kuruldu: ${title} (${outcome}) - ${alarmType} @ ${threshold}`, { alarmId: alarm.id });

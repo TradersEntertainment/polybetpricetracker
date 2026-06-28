@@ -229,7 +229,6 @@ saveAlarmBtn.addEventListener('click', async () => {
   const threshold = Number(thresholdValueInput.value);
   const chatId = chatIdInput.value.trim();
   if (isNaN(threshold) || threshold <= 0) return showToast('Geçerli bir limit girin.', 'error');
-  if (!chatId) return showToast('Telegram Chat ID girin.', 'error');
 
   localStorage.setItem('tg_chat_id', chatId);
 

@@ -242,6 +242,7 @@ body {
 /* Threshold & Telegram */
 .threshold-section, .telegram-section { padding: 0 0.75rem; margin-top: 0.6rem; }
 .field-label { font-size: 0.75rem; font-weight: 600; color: var(--text-2); margin-bottom: 0.3rem; display: block; }
+.field-hint { font-size: 0.68rem; color: var(--text-3); margin-top: 0.25rem; font-style: italic; }
 
 .threshold-input-wrap {
   position: relative; display: flex; align-items: center;
