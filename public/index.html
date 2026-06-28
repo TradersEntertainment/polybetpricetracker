@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PolyBetPriceTracker - Polymarket Fiyat & Orderbook Alarm Botu</title>
+  <title>PolyBetTracker - Polymarket Fiyat & Orderbook Takip</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -11,232 +11,226 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="noise-overlay"></div>
-  <div class="glow-orb orb-1"></div>
-  <div class="glow-orb orb-2"></div>
-  <div class="glow-orb orb-3"></div>
-
-  <div class="container">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="logo-area">
-        <div class="logo-icon"><i class="fa-solid fa-bolt"></i></div>
-        <div class="logo-text">
-          <h1>PolyBet<span>Tracker</span></h1>
-          <p class="logo-subtitle">Polymarket Insider & Fiyat Takip</p>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="system-status" id="systemStatus">
-          <span class="status-dot loading"></span>
-          <span class="status-text">Kontrol ediliyor...</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- URL Bar -->
-    <div class="url-bar glass-panel">
-      <div class="url-bar-inner">
-        <div class="url-icon"><i class="fa-solid fa-link"></i></div>
-        <input type="text" id="marketUrl" placeholder="Polymarket linkini buraya yapıştır..." autocomplete="off">
-        <button id="resolveBtn" class="resolve-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> <span>Çözümle</span></button>
-      </div>
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-icon"><i class="fa-solid fa-bolt"></i></div>
+      <span class="brand-name">Polymarket <b>Tracker</b></span>
     </div>
-
-    <!-- Loader -->
-    <div class="loader-bar hidden" id="resolveLoader">
-      <div class="loader-bar-inner"></div>
+    <div class="topbar-search">
+      <i class="fa-solid fa-magnifying-glass search-icon"></i>
+      <input type="text" id="marketUrl" placeholder="https://polymarket.com/event/will-microstrategy-announce..." autocomplete="off">
+      <button id="resolveBtn" class="track-btn">Track Market</button>
     </div>
+    <div class="topbar-status" id="systemStatus">
+      <span class="status-dot loading"></span>
+      <span class="status-label">Kontrol...</span>
+    </div>
+  </header>
 
-    <!-- Market Resolve Area (Hidden until resolved) -->
-    <div class="main-content hidden" id="step2">
-      <!-- Market Info Bar -->
-      <div class="market-info-bar glass-panel">
-        <div class="market-info-left">
-          <h2 id="resolvedQuestion" class="market-question">Market Başlığı</h2>
-          <div id="marketBadges" class="market-meta"></div>
+  <!-- Loader -->
+  <div class="top-loader hidden" id="resolveLoader"><div class="top-loader-bar"></div></div>
+
+  <div class="app-layout">
+    <!-- ═══ LEFT SIDEBAR ═══ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-title">Notification Alert Setup</div>
+
+      <!-- Alarm Type Toggles -->
+      <div class="alert-option">
+        <div class="alert-option-top">
+          <span class="alert-emoji">📈</span>
+          <span class="alert-name">Price Increases</span>
+          <label class="toggle"><input type="checkbox" id="togBidAbove" checked><span class="slider"></span></label>
         </div>
-        <div class="market-info-right">
-          <div class="outcome-buttons" id="outcomeButtons"></div>
+        <p class="alert-desc">En iyi alış fiyatı (Best Bid) hedefe ulaşınca bildirim.</p>
+        <button class="settings-toggle" data-target="settingsBidAbove"><i class="fa-solid fa-gear"></i> Settings</button>
+        <div class="settings-panel hidden" id="settingsBidAbove">
+          <p class="settings-note">Hedef fiyatı aşağıdaki "Target Price" alanından ayarlayın.</p>
         </div>
       </div>
 
-      <!-- Three Column Layout -->
-      <div class="content-grid">
-        <!-- Col 1: Alarm Setup -->
-        <div class="glass-panel alarm-setup-panel">
-          <div class="panel-header">
-            <i class="fa-solid fa-bell panel-icon"></i>
-            <h3>Alarm Kur</h3>
-          </div>
-          <div class="alarm-type-cards" id="alarmTypeCards">
-            <div class="alarm-type-card selected" data-type="bid_above">
-              <div class="atc-icon green-bg"><i class="fa-solid fa-arrow-trend-up"></i></div>
-              <div class="atc-info">
-                <div class="atc-title">Yükselirse Uyar</div>
-                <div class="atc-desc">En iyi alış (Best Bid) hedefe ulaşınca</div>
-              </div>
-            </div>
-            <div class="alarm-type-card" data-type="ask_below">
-              <div class="atc-icon red-bg"><i class="fa-solid fa-arrow-trend-down"></i></div>
-              <div class="atc-info">
-                <div class="atc-title">Düşerse Uyar</div>
-                <div class="atc-desc">En iyi satış (Best Ask) hedefe düşünce</div>
-              </div>
-            </div>
-            <div class="alarm-type-card" data-type="wall_created">
-              <div class="atc-icon orange-bg"><i class="fa-solid fa-tower-observation"></i></div>
-              <div class="atc-info">
-                <div class="atc-title">Balina / Duvar Tespiti</div>
-                <div class="atc-desc">Büyük emir yığılmasını tespit et</div>
-              </div>
-            </div>
-            <div class="alarm-type-card" data-type="liquidity_surge">
-              <div class="atc-icon cyan-bg"><i class="fa-solid fa-water"></i></div>
-              <div class="atc-info">
-                <div class="atc-title">Likidite Patlaması</div>
-                <div class="atc-desc">Derinlik kalınlaşmasını algıla</div>
-              </div>
-            </div>
-          </div>
-          <div class="threshold-section">
-            <label class="field-label" id="thresholdLabel">Hedef Fiyat</label>
-            <div class="threshold-input-wrap">
-              <input type="number" id="thresholdValue" step="0.01" placeholder="0.25">
-              <span class="threshold-suffix" id="thresholdSuffix">$</span>
-            </div>
-          </div>
-          <div class="telegram-section">
-            <label class="field-label">Telegram Chat / Grup ID</label>
-            <div class="tg-input-row">
-              <input type="text" id="chatId" placeholder="Boş bırakırsan genel kanala gider">
-              <button id="testTelegramBtn" class="test-btn" title="Test mesajı gönder"><i class="fa-solid fa-paper-plane"></i></button>
-            </div>
-            <p class="field-hint">Boş bırakırsanız bildirimler genel kanala gönderilir.</p>
-          </div>
-          <button id="saveAlarmBtn" class="save-alarm-btn">
-            <i class="fa-solid fa-bolt"></i> Alarmı Kur
-          </button>
+      <div class="alert-option">
+        <div class="alert-option-top">
+          <span class="alert-emoji">📉</span>
+          <span class="alert-name">Price Decreases</span>
+          <label class="toggle"><input type="checkbox" id="togAskBelow"><span class="slider"></span></label>
         </div>
-
-        <!-- Col 2: Orderbook -->
-        <div class="glass-panel orderbook-panel">
-          <div class="panel-header">
-            <i class="fa-solid fa-book-open panel-icon"></i>
-            <h3>Canlı Orderbook</h3>
-            <div class="ob-spread-badge" id="obMidPrice">Spread: --</div>
-          </div>
-          <p class="ob-tip"><i class="fa-solid fa-mouse-pointer"></i> Fiyata tıkla → alarm limiti otomatik dolar</p>
-          <div class="orderbook-grid">
-            <div class="ob-col ob-bids-col">
-              <div class="ob-col-header green-text"><i class="fa-solid fa-arrow-up"></i> Alıcılar (Bids)</div>
-              <div class="ob-list" id="obBidsList">
-                <div class="ob-empty">Yükleniyor...</div>
-              </div>
-            </div>
-            <div class="ob-col ob-asks-col">
-              <div class="ob-col-header red-text"><i class="fa-solid fa-arrow-down"></i> Satıcılar (Asks)</div>
-              <div class="ob-list" id="obAsksList">
-                <div class="ob-empty">Yükleniyor...</div>
-              </div>
-            </div>
-          </div>
+        <p class="alert-desc">En iyi satış fiyatı (Best Ask) hedefe düşünce bildirim.</p>
+        <button class="settings-toggle" data-target="settingsAskBelow"><i class="fa-solid fa-gear"></i> Settings</button>
+        <div class="settings-panel hidden" id="settingsAskBelow">
+          <p class="settings-note">Hedef fiyatı aşağıdaki "Target Price" alanından ayarlayın.</p>
         </div>
-
-        <!-- Col 3: Placeholder for alignment (only on desktop with market open) -->
-        <div class="desktop-spacer"></div>
       </div>
-    </div>
 
-    <!-- ═══ ALWAYS VISIBLE: Bottom Section ═══ -->
-    <div class="bottom-section">
+      <div class="alert-option">
+        <div class="alert-option-top">
+          <span class="alert-emoji">🐳</span>
+          <span class="alert-name">Whale/Wall Detection</span>
+          <label class="toggle"><input type="checkbox" id="togWall"><span class="slider"></span></label>
+        </div>
+        <p class="alert-desc">Büyük emir yığılmasını (duvar) tespit et.</p>
+        <button class="settings-toggle" data-target="settingsWall"><i class="fa-solid fa-gear"></i> Settings</button>
+        <div class="settings-panel hidden" id="settingsWall">
+          <label class="setting-label">Min. Duvar Boyutu (Shares)</label>
+          <input type="number" id="wallThreshold" class="setting-input" value="5000" step="1000">
+        </div>
+      </div>
+
+      <div class="alert-option">
+        <div class="alert-option-top">
+          <span class="alert-emoji">🌊</span>
+          <span class="alert-name">Liquidity Spikes</span>
+          <label class="toggle"><input type="checkbox" id="togLiquidity"><span class="slider"></span></label>
+        </div>
+        <p class="alert-desc">Derinlik kalınlaşmasını / likidite patlamasını algıla.</p>
+        <button class="settings-toggle" data-target="settingsLiquidity"><i class="fa-solid fa-gear"></i> Settings</button>
+        <div class="settings-panel hidden" id="settingsLiquidity">
+          <label class="setting-label">Kalınlaşma Oranı (%)</label>
+          <input type="number" id="liquidityThreshold" class="setting-input" value="50" step="5">
+        </div>
+      </div>
+
+      <div class="sidebar-divider"></div>
+
+      <!-- Target Price -->
+      <label class="sidebar-label">Target Price</label>
+      <div class="price-input-wrap">
+        <input type="number" id="thresholdValue" step="0.01" placeholder="0.18" value="">
+        <span class="price-suffix">$</span>
+      </div>
+
+      <!-- Telegram Chat ID -->
+      <label class="sidebar-label">Telegram Chat/Group ID</label>
+      <input type="text" id="chatId" class="sidebar-input" placeholder="Boş = genel kanal">
+      <p class="sidebar-hint">Boş bırakırsanız genel kanala gider.</p>
+
+      <!-- Buttons -->
+      <button id="saveAlarmBtn" class="create-btn"><i class="fa-solid fa-bell"></i> Create Alert</button>
+      <button id="testTelegramBtn" class="test-tg-btn"><i class="fa-solid fa-paper-plane"></i> Test Telegram</button>
+    </aside>
+
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <main class="main-area">
+      <!-- Market Info Bar (hidden until resolve) -->
+      <div class="market-bar hidden" id="marketBar">
+        <div class="market-bar-left">
+          <h2 id="resolvedQuestion" class="market-title">Market Başlığı</h2>
+          <div class="market-stats" id="marketBadges"></div>
+        </div>
+        <div class="market-bar-right" id="outcomeButtons"></div>
+      </div>
+
+      <!-- Live Orderbook (hidden until resolve) -->
+      <div class="orderbook-section hidden" id="orderbookSection">
+        <div class="orderbook-card">
+          <div class="ob-card-header">
+            <h3>Live Order Book</h3>
+            <span class="ob-spread" id="obMidPrice">Spread: --</span>
+          </div>
+          <div class="ob-body">
+            <!-- Bids table -->
+            <div class="ob-table-col bids-col">
+              <div class="ob-table-header green-text">BIDS (GREEN)</div>
+              <div class="ob-table-subheader">
+                <span>PRICE</span><span>VOLUME</span>
+              </div>
+              <div class="ob-rows" id="obBidsList"></div>
+            </div>
+            <!-- Depth Chart -->
+            <div class="depth-chart-col">
+              <canvas id="depthChart"></canvas>
+            </div>
+            <!-- Asks table -->
+            <div class="ob-table-col asks-col">
+              <div class="ob-table-header red-text">ASKS (RED)</div>
+              <div class="ob-table-subheader">
+                <span>PRICE</span><span>VOLUME</span>
+              </div>
+              <div class="ob-rows" id="obAsksList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Grid (ALWAYS VISIBLE) -->
       <div class="bottom-grid">
-        <!-- Active Alarms -->
-        <div class="glass-panel alarms-panel">
-          <div class="panel-header">
-            <i class="fa-solid fa-bell-concierge panel-icon"></i>
-            <h3>Aktif Alarmlar</h3>
-            <span class="alarm-count" id="alarmCount">0</span>
+        <div class="bottom-card">
+          <div class="bottom-card-header">
+            <h3>Active Alarms</h3>
+            <span class="badge" id="alarmCount">0</span>
           </div>
-          <div class="alarms-list" id="alarmsList">
-            <div class="empty-placeholder">
-              <i class="fa-regular fa-bell-slash"></i>
-              <span>Henüz alarm yok</span>
-            </div>
+          <div class="bottom-card-sub">
+            <span>ALARM</span><span>INDICATOR</span>
+          </div>
+          <div class="bottom-card-body" id="alarmsList">
+            <div class="empty-msg"><i class="fa-regular fa-bell-slash"></i> Henüz alarm yok</div>
           </div>
         </div>
 
-        <!-- System Logs -->
-        <div class="glass-panel logs-panel">
-          <div class="panel-header">
-            <i class="fa-solid fa-terminal panel-icon"></i>
-            <h3>Sistem Logları</h3>
+        <div class="bottom-card">
+          <div class="bottom-card-header">
+            <h3>System Logs</h3>
           </div>
-          <div class="logs-list" id="logsList">
-            <div class="log-entry sys">Sistem yükleniyor...</div>
+          <div class="bottom-card-body logs-body" id="logsList">
+            <div class="log-line sys">Sistem yükleniyor...</div>
           </div>
         </div>
 
-        <!-- Telegram Setup Card -->
-        <div class="glass-panel tg-card">
-          <div class="panel-header">
-            <i class="fa-brands fa-telegram panel-icon" style="color:#229ed9"></i>
-            <h3>Telegram Kurulumu</h3>
+        <div class="bottom-card">
+          <div class="bottom-card-header">
+            <h3>Telegram Bot Setup</h3>
           </div>
-          <div class="tg-card-body">
-            <div class="tg-step"><span class="tg-num">1</span> Railway'de <code>TELEGRAM_BOT_TOKEN</code> env'i ekleyin.</div>
-            <div class="tg-step"><span class="tg-num">2</span> Botu gruba ekleyip <b>Admin</b> yapın.</div>
-            <div class="tg-step"><span class="tg-num">3</span> Alarm kurarken Chat ID'yi girin (veya boş bırakın).</div>
+          <div class="bottom-card-body tg-body">
+            <div class="tg-step"><span class="tg-num">1</span> Start <code>@TELEGRAM_BOT_TOKEN</code> in Telegram.</div>
+            <div class="tg-step"><span class="tg-num">2</span> Add bot to group and promote to <b>Admin</b>.</div>
+            <div class="tg-step"><span class="tg-num">3</span> Enter Chat ID in the sidebar or leave empty for default channel.</div>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   </div>
 
-  <!-- ═══ EDIT ALARM MODAL ═══ -->
+  <!-- ═══ EDIT MODAL ═══ -->
   <div class="modal-overlay hidden" id="editModal">
-    <div class="modal-card glass-panel">
+    <div class="modal-card">
       <div class="modal-header">
         <h3><i class="fa-solid fa-pen-to-square"></i> Alarm Düzenle</h3>
-        <button class="modal-close" id="editModalClose"><i class="fa-solid fa-xmark"></i></button>
+        <button class="modal-x" id="editModalClose"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
-        <div class="modal-market-title" id="editTitle">Market Başlığı</div>
-
+        <div class="modal-market-title" id="editTitle">Market</div>
         <div class="modal-field">
-          <label class="field-label">Seçenek</label>
-          <div class="modal-outcome-btns" id="editOutcomeBtns">
-            <button class="outcome-btn active" data-outcome="yes">YES</button>
-            <button class="outcome-btn" data-outcome="no">NO</button>
+          <label class="modal-label">Seçenek</label>
+          <div class="modal-outcome-row" id="editOutcomeBtns">
+            <button class="mo-btn active" data-outcome="yes">YES</button>
+            <button class="mo-btn" data-outcome="no">NO</button>
           </div>
         </div>
-
         <div class="modal-field">
-          <label class="field-label">Alarm Türü</label>
-          <div class="modal-type-cards" id="editTypeCards">
-            <div class="alarm-type-card-mini" data-type="bid_above"><span class="dot green-dot"></span> Yükselirse Uyar</div>
-            <div class="alarm-type-card-mini" data-type="ask_below"><span class="dot red-dot"></span> Düşerse Uyar</div>
-            <div class="alarm-type-card-mini" data-type="wall_created"><span class="dot orange-dot"></span> Duvar Tespiti</div>
-            <div class="alarm-type-card-mini" data-type="liquidity_surge"><span class="dot cyan-dot"></span> Likidite Patlaması</div>
+          <label class="modal-label">Alarm Türü</label>
+          <div class="modal-type-list" id="editTypeCards">
+            <div class="mt-item" data-type="bid_above"><span class="mt-dot green"></span> Yükselirse Uyar</div>
+            <div class="mt-item" data-type="ask_below"><span class="mt-dot red"></span> Düşerse Uyar</div>
+            <div class="mt-item" data-type="wall_created"><span class="mt-dot orange"></span> Duvar Tespiti</div>
+            <div class="mt-item" data-type="liquidity_surge"><span class="mt-dot cyan"></span> Likidite Patlaması</div>
           </div>
         </div>
-
         <div class="modal-field">
-          <label class="field-label" id="editThresholdLabel">Hedef Fiyat</label>
-          <div class="threshold-input-wrap">
-            <input type="number" id="editThresholdValue" step="0.01" placeholder="0.25">
-            <span class="threshold-suffix" id="editThresholdSuffix">$</span>
+          <label class="modal-label" id="editThresholdLabel">Hedef Fiyat</label>
+          <div class="price-input-wrap">
+            <input type="number" id="editThresholdValue" step="0.01">
+            <span class="price-suffix" id="editThresholdSuffix">$</span>
           </div>
         </div>
-
         <div class="modal-field">
-          <label class="field-label">Telegram Chat ID</label>
-          <input type="text" id="editChatId" class="modal-input" placeholder="Boş bırakırsan genel kanal">
+          <label class="modal-label">Chat ID</label>
+          <input type="text" id="editChatId" class="sidebar-input" placeholder="Boş = genel kanal">
         </div>
       </div>
       <div class="modal-footer">
-        <button class="modal-cancel-btn" id="editCancelBtn">İptal</button>
-        <button class="modal-save-btn" id="editSaveBtn"><i class="fa-solid fa-check"></i> Kaydet</button>
+        <button class="mbtn-cancel" id="editCancelBtn">İptal</button>
+        <button class="mbtn-save" id="editSaveBtn"><i class="fa-solid fa-check"></i> Kaydet</button>
       </div>
     </div>
   </div>
@@ -244,7 +238,7 @@
   <!-- Toast -->
   <div class="toast hidden" id="toast">
     <span id="toastIcon"><i class="fa-solid fa-circle-check"></i></span>
-    <span id="toastMessage">İşlem başarılı.</span>
+    <span id="toastMessage">OK</span>
   </div>
 
   <script src="app.js"></script>

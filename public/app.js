@@ -3,15 +3,16 @@ let currentMarket = null;
 let currentOutcome = 'yes';
 let currentTokenId = null;
 let orderbookPollInterval = null;
-let selectedAlarmType = 'bid_above';
 let editingAlarmId = null;
+let lastBookData = null;
 
 // ─── DOM ───
 const $ = id => document.getElementById(id);
 const marketUrlInput = $('marketUrl');
 const resolveBtn = $('resolveBtn');
 const resolveLoader = $('resolveLoader');
-const step2 = $('step2');
+const marketBar = $('marketBar');
+const orderbookSection = $('orderbookSection');
 const resolvedQuestion = $('resolvedQuestion');
 const marketBadges = $('marketBadges');
 const outcomeButtons = $('outcomeButtons');
@@ -19,8 +20,6 @@ const obMidPrice = $('obMidPrice');
 const obBidsList = $('obBidsList');
 const obAsksList = $('obAsksList');
 const thresholdValueInput = $('thresholdValue');
-const thresholdLabel = $('thresholdLabel');
-const thresholdSuffix = $('thresholdSuffix');
 const chatIdInput = $('chatId');
 const saveAlarmBtn = $('saveAlarmBtn');
 const testTelegramBtn = $('testTelegramBtn');
@@ -30,8 +29,9 @@ const logsList = $('logsList');
 const toastEl = $('toast');
 const toastIcon = $('toastIcon');
 const toastMsg = $('toastMessage');
+const depthCanvas = $('depthChart');
 
-// Edit Modal DOM
+// Edit Modal
 const editModal = $('editModal');
 const editModalClose = $('editModalClose');
 const editCancelBtn = $('editCancelBtn');
@@ -56,39 +56,34 @@ window.addEventListener('DOMContentLoaded', () => {
   const savedChat = localStorage.getItem('tg_chat_id');
   if (savedChat) chatIdInput.value = savedChat;
 
-  // Alarm type card clicks (create form)
-  document.querySelectorAll('#alarmTypeCards .alarm-type-card').forEach(card => {
-    card.addEventListener('click', () => {
-      document.querySelectorAll('#alarmTypeCards .alarm-type-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      selectedAlarmType = card.dataset.type;
-      updateThresholdUI();
+  // Settings toggle panels
+  document.querySelectorAll('.settings-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = $(btn.dataset.target);
+      if (panel) panel.classList.toggle('hidden');
     });
   });
 
-  // Edit modal type cards
+  // Edit modal: type cards
   editTypeCards.addEventListener('click', e => {
-    const card = e.target.closest('.alarm-type-card-mini');
-    if (!card) return;
-    editTypeCards.querySelectorAll('.alarm-type-card-mini').forEach(c => c.classList.remove('selected'));
-    card.classList.add('selected');
-    updateEditThresholdUI(card.dataset.type);
+    const item = e.target.closest('.mt-item');
+    if (!item) return;
+    editTypeCards.querySelectorAll('.mt-item').forEach(c => c.classList.remove('selected'));
+    item.classList.add('selected');
+    updateEditThresholdUI(item.dataset.type);
   });
 
-  // Edit modal outcome buttons
+  // Edit modal: outcome buttons
   editOutcomeBtns.addEventListener('click', e => {
-    const btn = e.target.closest('.outcome-btn');
+    const btn = e.target.closest('.mo-btn');
     if (!btn) return;
-    editOutcomeBtns.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('active'));
+    editOutcomeBtns.querySelectorAll('.mo-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
   });
 
-  // Close modal
   editModalClose.addEventListener('click', closeEditModal);
   editCancelBtn.addEventListener('click', closeEditModal);
   editModal.addEventListener('click', e => { if (e.target === editModal) closeEditModal(); });
-
-  // Save edit
   editSaveBtn.addEventListener('click', handleEditSave);
 });
 
@@ -97,14 +92,15 @@ marketUrlInput.addEventListener('paste', () => setTimeout(handleResolve, 100));
 marketUrlInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleResolve(); });
 resolveBtn.addEventListener('click', handleResolve);
 
-// ─── Resolve Market ───
+// ─── Resolve ───
 async function handleResolve() {
   const url = marketUrlInput.value.trim();
-  if (!url) return showToast('Lütfen Polymarket linki yapıştırın.', 'error');
+  if (!url) return showToast('Polymarket linki yapıştırın.', 'error');
 
   if (orderbookPollInterval) { clearInterval(orderbookPollInterval); orderbookPollInterval = null; }
   resolveLoader.classList.remove('hidden');
-  step2.classList.add('hidden');
+  marketBar.classList.add('hidden');
+  orderbookSection.classList.add('hidden');
 
   try {
     const res = await fetch('/api/resolve', {
@@ -119,13 +115,18 @@ async function handleResolve() {
     currentTokenId = currentMarket.clobTokenIds?.[0];
     if (!currentTokenId) throw new Error('Token ID bulunamadı.');
 
-    renderMarketInfo();
+    renderMarketBar();
     await fetchAndRenderOrderbook();
-    updateThresholdUI();
+
+    // Set default threshold
+    if (currentMarket.prices?.[0] !== undefined) {
+      thresholdValueInput.value = currentMarket.prices[0].toFixed(2);
+    }
 
     orderbookPollInterval = setInterval(fetchAndRenderOrderbook, 5000);
     resolveLoader.classList.add('hidden');
-    step2.classList.remove('hidden');
+    marketBar.classList.remove('hidden');
+    orderbookSection.classList.remove('hidden');
     showToast('Market çözümlendi!', 'success');
   } catch (err) {
     resolveLoader.classList.add('hidden');
@@ -133,66 +134,46 @@ async function handleResolve() {
   }
 }
 
-// ─── Market Info ───
-function renderMarketInfo() {
+// ─── Market Bar ───
+function renderMarketBar() {
   resolvedQuestion.textContent = currentMarket.question;
   const vol = Math.round(currentMarket.volume).toLocaleString();
   const liq = Math.round(currentMarket.liquidity).toLocaleString();
-  marketBadges.innerHTML = `
-    <span class="meta-tag accent">${currentMarket.slug}</span>
-    <span class="meta-tag">Hacim: $${vol}</span>
-    <span class="meta-tag">Likidite: $${liq}</span>
-  `;
-
   const p = currentMarket.prices || [0.5, 0.5];
-  outcomeButtons.innerHTML = `
-    <button type="button" class="outcome-btn active" data-outcome="yes">
-      YES <span class="price-tag">${p[0]?.toFixed(2) || '--'}$</span>
-    </button>
-    <button type="button" class="outcome-btn" data-outcome="no">
-      NO <span class="price-tag">${p[1]?.toFixed(2) || '--'}$</span>
-    </button>
+
+  marketBadges.innerHTML = `
+    <span><span class="stat-label">Volume:</span> <span class="stat-val">$${vol}</span></span>
+    <span><span class="stat-label">Liquidity:</span> <span class="stat-val">$${liq}</span></span>
   `;
 
-  outcomeButtons.querySelectorAll('.outcome-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const oc = btn.dataset.outcome;
+  outcomeButtons.innerHTML = `
+    <div class="outcome-pill yes active" data-outcome="yes">
+      <span class="oc-label">YES</span>
+      <span class="oc-price">$${p[0]?.toFixed(2) || '--'}</span>
+      <span class="oc-arrow">↑</span>
+    </div>
+    <div class="outcome-pill no" data-outcome="no">
+      <span class="oc-label">NO</span>
+      <span class="oc-price">$${p[1]?.toFixed(2) || '--'}</span>
+      <span class="oc-arrow">↓</span>
+    </div>
+  `;
+
+  outcomeButtons.querySelectorAll('.outcome-pill').forEach(pill => {
+    pill.addEventListener('click', async () => {
+      const oc = pill.dataset.outcome;
       if (oc === currentOutcome) return;
-      outcomeButtons.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      outcomeButtons.querySelectorAll('.outcome-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
       currentOutcome = oc;
       currentTokenId = currentMarket.clobTokenIds[oc === 'yes' ? 0 : 1];
-      updateThresholdUI();
+      const idx = oc === 'yes' ? 0 : 1;
+      if (currentMarket.prices?.[idx] !== undefined) {
+        thresholdValueInput.value = currentMarket.prices[idx].toFixed(2);
+      }
       await fetchAndRenderOrderbook();
     });
   });
-}
-
-// ─── Threshold UI ───
-function updateThresholdUI() {
-  const t = selectedAlarmType;
-  if (t === 'bid_above' || t === 'ask_below') {
-    thresholdLabel.textContent = 'Hedef Fiyat';
-    thresholdSuffix.textContent = '$';
-    thresholdValueInput.step = '0.01';
-    thresholdValueInput.placeholder = '0.25';
-    const idx = currentOutcome === 'yes' ? 0 : 1;
-    if (currentMarket?.prices?.[idx] !== undefined) {
-      thresholdValueInput.value = currentMarket.prices[idx].toFixed(2);
-    }
-  } else if (t === 'wall_created') {
-    thresholdLabel.textContent = 'Minimum Duvar Boyutu';
-    thresholdSuffix.textContent = 'Adet';
-    thresholdValueInput.step = '1000';
-    thresholdValueInput.value = '5000';
-    thresholdValueInput.placeholder = '5000';
-  } else if (t === 'liquidity_surge') {
-    thresholdLabel.textContent = 'Kalınlaşma Oranı';
-    thresholdSuffix.textContent = '%';
-    thresholdValueInput.step = '5';
-    thresholdValueInput.value = '50';
-    thresholdValueInput.placeholder = '50';
-  }
 }
 
 // ─── Orderbook ───
@@ -205,85 +186,244 @@ async function fetchAndRenderOrderbook() {
     });
     const data = await res.json();
     if (!data.success || !data.book) throw new Error(data.error || 'Orderbook yüklenemedi.');
+    lastBookData = data.book;
     renderOrderbook(data.book);
+    renderDepthChart(data.book);
   } catch (err) {
     obBidsList.innerHTML = `<div class="ob-empty">Hata: ${err.message}</div>`;
-    obAsksList.innerHTML = `<div class="ob-empty">Hata: ${err.message}</div>`;
+    obAsksList.innerHTML = `<div class="ob-empty">Hata</div>`;
   }
 }
 
 function renderOrderbook(book) {
   const bids = book.bids || [];
   const asks = book.asks || [];
-  const spread = book.spread !== null && book.spread !== undefined ? book.spread.toFixed(2) : '--';
+  const spread = book.spread != null ? book.spread.toFixed(3) : '--';
   const mid = book.midPrice || '--';
   obMidPrice.textContent = `Mid: ${mid}$ | Spread: ${spread}$`;
 
-  const allSizes = [...bids.map(b => b.size), ...asks.map(a => a.size)];
-  const maxSize = allSizes.length > 0 ? Math.max(...allSizes) : 1;
-  const wallThreshold = getWallThreshold();
+  const wallT = getWallThreshold();
 
-  obBidsList.innerHTML = bids.length === 0 ? '<div class="ob-empty">Alış emri yok</div>' :
-    bids.slice(0, 20).map(b => obRowHtml(b, maxSize, wallThreshold)).join('');
+  obBidsList.innerHTML = bids.length === 0 ? '<div class="ob-empty">Yok</div>' :
+    bids.slice(0, 20).map(b => {
+      const w = b.size >= wallT ? 'wall' : '';
+      return `<div class="ob-row ${w}" data-price="${b.price.toFixed(2)}">
+        <span class="ob-price">${b.price.toFixed(2)}$</span>
+        <span class="ob-vol">${w ? '🐳 ' : ''}${Math.round(b.size).toLocaleString()}</span>
+      </div>`;
+    }).join('');
 
-  obAsksList.innerHTML = asks.length === 0 ? '<div class="ob-empty">Satış emri yok</div>' :
-    asks.slice(0, 20).map(a => obRowHtml(a, maxSize, wallThreshold)).join('');
+  obAsksList.innerHTML = asks.length === 0 ? '<div class="ob-empty">Yok</div>' :
+    asks.slice(0, 20).map(a => {
+      const w = a.size >= wallT ? 'wall' : '';
+      return `<div class="ob-row ${w}" data-price="${a.price.toFixed(2)}">
+        <span class="ob-price">${a.price.toFixed(2)}$</span>
+        <span class="ob-vol">${w ? '🐳 ' : ''}${Math.round(a.size).toLocaleString()}</span>
+      </div>`;
+    }).join('');
 
+  // Click rows to fill threshold
   document.querySelectorAll('.ob-row').forEach(row => {
     row.addEventListener('click', () => {
       const p = row.dataset.price;
       thresholdValueInput.value = p;
-      thresholdValueInput.style.borderColor = 'var(--green)';
-      thresholdValueInput.style.boxShadow = '0 0 12px rgba(34,197,94,0.25)';
-      setTimeout(() => { thresholdValueInput.style.borderColor = ''; thresholdValueInput.style.boxShadow = ''; }, 800);
       showToast(`Hedef: ${p}$`, 'info');
     });
   });
 }
 
-function obRowHtml(level, maxSize, wallThreshold) {
-  const pct = (level.size / maxSize) * 100;
-  const isWall = level.size >= wallThreshold;
-  return `<div class="ob-row ${isWall ? 'wall' : ''}" data-price="${level.price.toFixed(2)}">
-    <div class="ob-row-bar" style="width:${pct}%"></div>
-    <span class="ob-row-price">${level.price.toFixed(2)}$</span>
-    <span class="ob-row-size">${isWall ? '🐳 ' : ''}${Math.round(level.size).toLocaleString()}</span>
-  </div>`;
+// ─── Depth Chart (Canvas) ───
+function renderDepthChart(book) {
+  const canvas = depthCanvas;
+  const parent = canvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  const w = parent.clientWidth;
+  const h = parent.clientHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const bids = (book.bids || []).slice(0, 25);
+  const asks = (book.asks || []).slice(0, 25);
+  if (bids.length === 0 && asks.length === 0) return;
+
+  // Build cumulative arrays
+  let bidCum = [], askCum = [];
+  let cumBid = 0;
+  for (let i = 0; i < bids.length; i++) {
+    cumBid += bids[i].size;
+    bidCum.push({ price: bids[i].price, cum: cumBid });
+  }
+  let cumAsk = 0;
+  for (let i = 0; i < asks.length; i++) {
+    cumAsk += asks[i].size;
+    askCum.push({ price: asks[i].price, cum: cumAsk });
+  }
+
+  const maxCum = Math.max(cumBid, cumAsk, 1);
+  const allPrices = [...bidCum.map(b => b.price), ...askCum.map(a => a.price)];
+  const minPrice = Math.min(...allPrices);
+  const maxPrice = Math.max(...allPrices);
+  const priceRange = maxPrice - minPrice || 0.01;
+
+  const pad = { top: 15, bottom: 25, left: 10, right: 10 };
+  const cw = w - pad.left - pad.right;
+  const ch = h - pad.top - pad.bottom;
+
+  function priceToX(price) { return pad.left + ((price - minPrice) / priceRange) * cw; }
+  function cumToY(cum) { return pad.top + ch - (cum / maxCum) * ch; }
+
+  // Draw grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (ch / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+  }
+
+  // Price labels
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.font = '10px "JetBrains Mono"';
+  ctx.textAlign = 'center';
+  const labelCount = 5;
+  for (let i = 0; i <= labelCount; i++) {
+    const price = minPrice + (priceRange / labelCount) * i;
+    const x = priceToX(price);
+    ctx.fillText(price.toFixed(2) + '$', x, h - 5);
+  }
+
+  // Draw bid area (green, right-to-left step)
+  if (bidCum.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(priceToX(bidCum[0].price), cumToY(0));
+    for (let i = 0; i < bidCum.length; i++) {
+      const x = priceToX(bidCum[i].price);
+      const y = cumToY(bidCum[i].cum);
+      if (i > 0) {
+        ctx.lineTo(x, cumToY(bidCum[i - 1].cum)); // horizontal step
+      }
+      ctx.lineTo(x, y);
+    }
+    // Fill
+    const lastBid = bidCum[bidCum.length - 1];
+    ctx.lineTo(priceToX(lastBid.price), cumToY(0));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(34, 197, 94, 0.12)';
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.moveTo(priceToX(bidCum[0].price), cumToY(0));
+    for (let i = 0; i < bidCum.length; i++) {
+      const x = priceToX(bidCum[i].price);
+      const y = cumToY(bidCum[i].cum);
+      if (i > 0) ctx.lineTo(x, cumToY(bidCum[i - 1].cum));
+      ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(34, 197, 94, 0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // Draw ask area (red, left-to-right step)
+  if (askCum.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(priceToX(askCum[0].price), cumToY(0));
+    for (let i = 0; i < askCum.length; i++) {
+      const x = priceToX(askCum[i].price);
+      const y = cumToY(askCum[i].cum);
+      if (i > 0) ctx.lineTo(x, cumToY(askCum[i - 1].cum));
+      ctx.lineTo(x, y);
+    }
+    const lastAsk = askCum[askCum.length - 1];
+    ctx.lineTo(priceToX(lastAsk.price), cumToY(0));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.12)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(priceToX(askCum[0].price), cumToY(0));
+    for (let i = 0; i < askCum.length; i++) {
+      const x = priceToX(askCum[i].price);
+      const y = cumToY(askCum[i].cum);
+      if (i > 0) ctx.lineTo(x, cumToY(askCum[i - 1].cum));
+      ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
 }
 
+// Resize depth chart
+window.addEventListener('resize', () => {
+  if (lastBookData) renderDepthChart(lastBookData);
+});
+
 function getWallThreshold() {
-  if (selectedAlarmType === 'wall_created') {
-    const v = Number(thresholdValueInput.value);
+  const togWall = $('togWall');
+  if (togWall && togWall.checked) {
+    const v = Number($('wallThreshold')?.value);
     if (!isNaN(v) && v > 0) return v;
   }
   return 5000;
 }
 
+// ─── Determine active alarm types from sidebar toggles ───
+function getSelectedAlarmType() {
+  if ($('togBidAbove')?.checked) return 'bid_above';
+  if ($('togAskBelow')?.checked) return 'ask_below';
+  if ($('togWall')?.checked) return 'wall_created';
+  if ($('togLiquidity')?.checked) return 'liquidity_surge';
+  return 'bid_above';
+}
+
 // ─── Save Alarm ───
 saveAlarmBtn.addEventListener('click', async () => {
   if (!currentMarket || !currentTokenId) return showToast('Önce bir market çözümleyin.', 'error');
-  const threshold = Number(thresholdValueInput.value);
-  const chatId = chatIdInput.value.trim();
-  if (isNaN(threshold) || threshold <= 0) return showToast('Geçerli bir limit girin.', 'error');
 
+  const chatId = chatIdInput.value.trim();
   localStorage.setItem('tg_chat_id', chatId);
 
-  try {
-    const res = await fetch('/api/alarms', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        url: currentMarket.originalUrl, slug: currentMarket.slug,
-        marketId: currentMarket.marketId, title: currentMarket.question,
-        outcome: currentOutcome, tokenId: currentTokenId,
-        alarmType: selectedAlarmType, threshold, chatId
-      })
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    showToast('Alarm kuruldu!', 'success');
+  // Create alarms for each checked type
+  const types = [];
+  if ($('togBidAbove')?.checked) types.push({ type: 'bid_above', threshold: Number(thresholdValueInput.value) });
+  if ($('togAskBelow')?.checked) types.push({ type: 'ask_below', threshold: Number(thresholdValueInput.value) });
+  if ($('togWall')?.checked) types.push({ type: 'wall_created', threshold: Number($('wallThreshold')?.value || 5000) });
+  if ($('togLiquidity')?.checked) types.push({ type: 'liquidity_surge', threshold: Number($('liquidityThreshold')?.value || 50) });
+
+  if (types.length === 0) return showToast('En az bir alarm türünü açın.', 'error');
+
+  let created = 0;
+  for (const t of types) {
+    if (isNaN(t.threshold) || t.threshold <= 0) continue;
+    try {
+      const res = await fetch('/api/alarms', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: currentMarket.originalUrl, slug: currentMarket.slug,
+          marketId: currentMarket.marketId, title: currentMarket.question,
+          outcome: currentOutcome, tokenId: currentTokenId,
+          alarmType: t.type, threshold: t.threshold, chatId
+        })
+      });
+      const data = await res.json();
+      if (!data.error) created++;
+    } catch (e) { console.error(e); }
+  }
+
+  if (created > 0) {
+    showToast(`${created} alarm kuruldu!`, 'success');
     fetchAlarms();
     fetchLogs();
-  } catch (err) { showToast(err.message, 'error'); }
+  } else {
+    showToast('Alarm oluşturulamadı.', 'error');
+  }
 });
 
 // ─── Test Telegram ───
@@ -299,13 +439,12 @@ testTelegramBtn.addEventListener('click', async () => {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     showToast('Test mesajı gönderildi!', 'success');
-    fetchLogs();
   } catch (err) { showToast(err.message, 'error'); }
 });
 
-// ═══════════════════════════════════════
-// ─── ALARMS LIST (clickable to edit) ───
-// ═══════════════════════════════════════
+// ═══════════════════════════
+// ─── ALARMS LIST ──────────
+// ═══════════════════════════
 async function fetchAlarms() {
   try {
     const res = await fetch('/api/alarms');
@@ -313,7 +452,7 @@ async function fetchAlarms() {
     alarmCountBadge.textContent = alarms.length;
 
     if (!alarms.length) {
-      alarmsList.innerHTML = `<div class="empty-placeholder"><i class="fa-regular fa-bell-slash"></i><span>Henüz alarm yok</span></div>`;
+      alarmsList.innerHTML = `<div class="empty-msg"><i class="fa-regular fa-bell-slash"></i> Henüz alarm yok</div>`;
       return;
     }
 
@@ -321,72 +460,58 @@ async function fetchAlarms() {
       const cls = a.active ? '' : 'inactive';
       const togIcon = a.active ? 'fa-pause' : 'fa-play';
       const { kind, suffix } = alarmMeta(a.alarmType);
-      return `<div class="alarm-item ${cls}" data-alarm-id="${a.id}">
-        <div class="alarm-item-top">
-          <div class="alarm-item-title" title="${a.title}">${a.title}</div>
-          <div class="alarm-item-actions">
-            <button onclick="event.stopPropagation(); toggleAlarm('${a.id}')" title="${a.active ? 'Durdur' : 'Başlat'}"><i class="fa-solid ${togIcon}"></i></button>
-            <button class="del" onclick="event.stopPropagation(); deleteAlarm('${a.id}')" title="Sil"><i class="fa-solid fa-trash"></i></button>
-          </div>
-        </div>
-        <div class="alarm-item-tags">
+      return `<div class="alarm-row ${cls}" data-alarm-id="${a.id}">
+        <span class="alarm-row-title" title="${a.title}">${a.title}</span>
+        <div class="alarm-row-tags">
           <span class="atag ${a.outcome}">${a.outcome.toUpperCase()}</span>
-          <span class="atag kind">${kind}</span>
-          <span class="atag target">${a.threshold}${suffix}</span>
+          <span class="atag val">${a.threshold}${suffix}</span>
+        </div>
+        <div class="alarm-row-actions">
+          <button onclick="event.stopPropagation(); toggleAlarm('${a.id}')" title="${a.active ? 'Durdur' : 'Başlat'}"><i class="fa-solid ${togIcon}"></i></button>
+          <button class="del" onclick="event.stopPropagation(); deleteAlarm('${a.id}')" title="Sil"><i class="fa-solid fa-trash"></i></button>
         </div>
       </div>`;
     }).join('');
 
-    // Click on alarm item → open edit modal
-    alarmsList.querySelectorAll('.alarm-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const id = item.dataset.alarmId;
-        const alarm = alarms.find(a => a.id === id);
+    // Click alarm → edit modal
+    alarmsList.querySelectorAll('.alarm-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const alarm = alarms.find(a => a.id === row.dataset.alarmId);
         if (alarm) openEditModal(alarm);
       });
     });
-  } catch (err) { console.error('Alarms fetch error:', err); }
+  } catch (err) { console.error('Alarms error:', err); }
 }
 
 function alarmMeta(type) {
-  switch (type) {
-    case 'bid_above': return { kind: 'Yükselirse 📈', suffix: '$' };
-    case 'ask_below': return { kind: 'Düşerse 📉', suffix: '$' };
-    case 'price_above': return { kind: 'Mid Üzeri 📈', suffix: '$' };
-    case 'price_below': return { kind: 'Mid Altı 📉', suffix: '$' };
-    case 'wall_created': return { kind: 'Duvar 🐳', suffix: ' Adet' };
-    case 'liquidity_surge': return { kind: 'Likidite 🌊', suffix: '%' };
-    default: return { kind: type, suffix: '' };
-  }
+  const map = {
+    bid_above: { kind: 'Yükselirse 📈', suffix: '$' },
+    ask_below: { kind: 'Düşerse 📉', suffix: '$' },
+    price_above: { kind: 'Mid↑', suffix: '$' },
+    price_below: { kind: 'Mid↓', suffix: '$' },
+    wall_created: { kind: 'Duvar 🐳', suffix: ' Adet' },
+    liquidity_surge: { kind: 'Likidite 🌊', suffix: '%' },
+  };
+  return map[type] || { kind: type, suffix: '' };
 }
 
-// ═══════════════════════════
-// ─── EDIT MODAL ───────────
-// ═══════════════════════════
+// ═══════════════════
+// ─── EDIT MODAL ───
+// ═══════════════════
 function openEditModal(alarm) {
   editingAlarmId = alarm.id;
-
-  // Title
   editTitle.textContent = alarm.title;
 
-  // Outcome
-  editOutcomeBtns.querySelectorAll('.outcome-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.outcome === alarm.outcome);
-  });
+  editOutcomeBtns.querySelectorAll('.mo-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.outcome === alarm.outcome));
 
-  // Alarm type
-  editTypeCards.querySelectorAll('.alarm-type-card-mini').forEach(card => {
-    card.classList.toggle('selected', card.dataset.type === alarm.alarmType);
-  });
+  editTypeCards.querySelectorAll('.mt-item').forEach(c =>
+    c.classList.toggle('selected', c.dataset.type === alarm.alarmType));
 
-  // Threshold
   editThresholdValue.value = alarm.threshold;
   updateEditThresholdUI(alarm.alarmType);
-
-  // Chat ID
   editChatId.value = alarm.chatId || '';
 
-  // Show
   editModal.classList.remove('hidden');
   document.body.style.overflow = 'hidden';
 }
@@ -403,7 +528,7 @@ function updateEditThresholdUI(type) {
     editThresholdSuffix.textContent = '$';
     editThresholdValue.step = '0.01';
   } else if (type === 'wall_created') {
-    editThresholdLabel.textContent = 'Minimum Duvar Boyutu';
+    editThresholdLabel.textContent = 'Min. Duvar Boyutu';
     editThresholdSuffix.textContent = 'Adet';
     editThresholdValue.step = '1000';
   } else if (type === 'liquidity_surge') {
@@ -415,9 +540,8 @@ function updateEditThresholdUI(type) {
 
 async function handleEditSave() {
   if (!editingAlarmId) return;
-
-  const selectedType = editTypeCards.querySelector('.alarm-type-card-mini.selected')?.dataset.type;
-  const selectedOutcome = editOutcomeBtns.querySelector('.outcome-btn.active')?.dataset.outcome;
+  const selectedType = editTypeCards.querySelector('.mt-item.selected')?.dataset.type;
+  const selectedOutcome = editOutcomeBtns.querySelector('.mo-btn.active')?.dataset.outcome;
   const threshold = Number(editThresholdValue.value);
   const chatId = editChatId.value.trim();
 
@@ -427,12 +551,7 @@ async function handleEditSave() {
   try {
     const res = await fetch(`/api/alarms/${editingAlarmId}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        alarmType: selectedType,
-        outcome: selectedOutcome,
-        threshold,
-        chatId
-      })
+      body: JSON.stringify({ alarmType: selectedType, outcome: selectedOutcome, threshold, chatId })
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
@@ -443,7 +562,7 @@ async function handleEditSave() {
   } catch (err) { showToast(err.message, 'error'); }
 }
 
-// ─── Delete & Toggle (global) ───
+// ─── Delete & Toggle ───
 window.deleteAlarm = async id => {
   if (!confirm('Alarm silinsin mi?')) return;
   try {
@@ -470,13 +589,13 @@ async function fetchLogs() {
   try {
     const res = await fetch('/api/logs');
     const logs = await res.json();
-    if (!logs.length) { logsList.innerHTML = '<div class="ob-empty">Log yok.</div>'; return; }
-    logsList.innerHTML = logs.slice(0, 30).map(l => {
+    if (!logs.length) { logsList.innerHTML = '<div class="empty-msg">Log yok</div>'; return; }
+    logsList.innerHTML = logs.slice(0, 40).map(l => {
       let cls = 'sys';
       if (l.message.includes('[ALARM TETİKLENDİ]')) cls = 'alert';
       else if (l.message.includes('Hata')) cls = 'err';
       const t = new Date(l.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      return `<div class="log-entry ${cls}"><span class="ts">${t}</span> ${l.message}</div>`;
+      return `<div class="log-line ${cls}"><span class="ts">[${t}]</span> ${l.message}</div>`;
     }).join('');
   } catch (e) { console.error('Logs error:', e); }
 }
@@ -487,7 +606,7 @@ async function fetchSystemStatus() {
     const res = await fetch('/api/status');
     const s = await res.json();
     const dot = $('systemStatus').querySelector('.status-dot');
-    const txt = $('systemStatus').querySelector('.status-text');
+    const txt = $('systemStatus').querySelector('.status-label');
     if (s.telegramConfigured) {
       dot.className = 'status-dot online';
       txt.textContent = `Aktif (${s.activeAlarmsCount} takip)`;
@@ -497,9 +616,9 @@ async function fetchSystemStatus() {
     }
   } catch {
     const dot = $('systemStatus').querySelector('.status-dot');
-    const txt = $('systemStatus').querySelector('.status-text');
+    const txt = $('systemStatus').querySelector('.status-label');
     dot.className = 'status-dot offline';
-    txt.textContent = 'Bağlantı yok';
+    txt.textContent = 'Offline';
   }
 }
 
