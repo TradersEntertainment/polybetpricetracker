@@ -46,7 +46,14 @@
         <p class="alert-desc">Belirlediğiniz hedef fiyata ulaşıldığında bildirim gönderir.</p>
         <button class="settings-toggle" data-target="settingsPriceAlert"><i class="fa-solid fa-gear"></i> Settings</button>
         <div class="settings-panel hidden" id="settingsPriceAlert">
-          <p class="settings-note">Hedef fiyata göre artış (📈) veya düşüş (📉) yönü otomatik belirlenir.</p>
+          <label class="setting-label">Referans Fiyat Türü</label>
+          <select id="priceRefType" class="setting-input">
+            <option value="bid_ask">Bid / Ask (Gerçek Alım-Satım Fiyatı)</option>
+            <option value="mid">Mid Price (Orta Fiyat)</option>
+          </select>
+          <p class="settings-note" style="margin-top: 0.3rem;">
+            Hedef fiyata göre yön (üstüne çıkınca 📈 / altına inince 📉) otomatik belirlenir.
+          </p>
         </div>
       </div>
 

@@ -401,7 +401,16 @@ saveAlarmBtn.addEventListener('click', async () => {
       }
     }
     
-    const direction = targetVal >= currentPrice ? 'bid_above' : 'ask_below';
+    const isAbove = targetVal >= currentPrice;
+    const refType = $('priceRefType')?.value || 'bid_ask';
+    
+    let direction = 'bid_above';
+    if (refType === 'mid') {
+      direction = isAbove ? 'price_above' : 'price_below';
+    } else {
+      direction = isAbove ? 'bid_above' : 'ask_below';
+    }
+    
     types.push({ type: direction, threshold: targetVal });
   }
 
