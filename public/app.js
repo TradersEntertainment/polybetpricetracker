@@ -64,6 +64,22 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Toggle card active states based on checkbox state
+  const bindCheckboxActiveState = (checkboxId) => {
+    const cb = $(checkboxId);
+    if (cb) {
+      const updateClass = () => {
+        const card = cb.closest('.alert-option');
+        if (card) card.classList.toggle('active', cb.checked);
+      };
+      cb.addEventListener('change', updateClass);
+      updateClass();
+    }
+  };
+  bindCheckboxActiveState('togPriceAlert');
+  bindCheckboxActiveState('togWall');
+  bindCheckboxActiveState('togLiquidity');
+
   // Edit modal: type cards
   editTypeCards.addEventListener('click', e => {
     const item = e.target.closest('.mt-item');
