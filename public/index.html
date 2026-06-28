@@ -34,7 +34,7 @@
       </div>
     </header>
 
-    <!-- URL Bar - Always visible, prominent -->
+    <!-- URL Bar -->
     <div class="url-bar glass-panel">
       <div class="url-bar-inner">
         <div class="url-icon"><i class="fa-solid fa-link"></i></div>
@@ -48,7 +48,7 @@
       <div class="loader-bar-inner"></div>
     </div>
 
-    <!-- Main Content Area (Hidden until resolved) -->
+    <!-- Market Resolve Area (Hidden until resolved) -->
     <div class="main-content hidden" id="step2">
       <!-- Market Info Bar -->
       <div class="market-info-bar glass-panel">
@@ -69,21 +69,19 @@
             <i class="fa-solid fa-bell panel-icon"></i>
             <h3>Alarm Kur</h3>
           </div>
-
-          <!-- Alarm Type Cards -->
           <div class="alarm-type-cards" id="alarmTypeCards">
             <div class="alarm-type-card selected" data-type="bid_above">
               <div class="atc-icon green-bg"><i class="fa-solid fa-arrow-trend-up"></i></div>
               <div class="atc-info">
                 <div class="atc-title">Yükselirse Uyar</div>
-                <div class="atc-desc">En iyi alış fiyatı (Best Bid) hedefe ulaşınca</div>
+                <div class="atc-desc">En iyi alış (Best Bid) hedefe ulaşınca</div>
               </div>
             </div>
             <div class="alarm-type-card" data-type="ask_below">
               <div class="atc-icon red-bg"><i class="fa-solid fa-arrow-trend-down"></i></div>
               <div class="atc-info">
                 <div class="atc-title">Düşerse Uyar</div>
-                <div class="atc-desc">En iyi satış fiyatı (Best Ask) hedefe düşünce</div>
+                <div class="atc-desc">En iyi satış (Best Ask) hedefe düşünce</div>
               </div>
             </div>
             <div class="alarm-type-card" data-type="wall_created">
@@ -101,8 +99,6 @@
               </div>
             </div>
           </div>
-
-          <!-- Threshold Input -->
           <div class="threshold-section">
             <label class="field-label" id="thresholdLabel">Hedef Fiyat</label>
             <div class="threshold-input-wrap">
@@ -110,8 +106,6 @@
               <span class="threshold-suffix" id="thresholdSuffix">$</span>
             </div>
           </div>
-
-          <!-- Telegram -->
           <div class="telegram-section">
             <label class="field-label">Telegram Chat / Grup ID</label>
             <div class="tg-input-row">
@@ -120,8 +114,6 @@
             </div>
             <p class="field-hint">Boş bırakırsanız bildirimler genel kanala gönderilir.</p>
           </div>
-
-          <!-- Save Button -->
           <button id="saveAlarmBtn" class="save-alarm-btn">
             <i class="fa-solid fa-bolt"></i> Alarmı Kur
           </button>
@@ -151,42 +143,100 @@
           </div>
         </div>
 
-        <!-- Col 3: Active Alarms + Logs -->
-        <div class="sidebar-stack">
-          <!-- Active Alarms -->
-          <div class="glass-panel alarms-panel">
-            <div class="panel-header">
-              <i class="fa-solid fa-bell-concierge panel-icon"></i>
-              <h3>Aktif Alarmlar</h3>
-              <span class="alarm-count" id="alarmCount">0</span>
-            </div>
-            <div class="alarms-list" id="alarmsList">
-              <div class="empty-placeholder">
-                <i class="fa-regular fa-bell-slash"></i>
-                <span>Henüz alarm yok</span>
-              </div>
+        <!-- Col 3: Placeholder for alignment (only on desktop with market open) -->
+        <div class="desktop-spacer"></div>
+      </div>
+    </div>
+
+    <!-- ═══ ALWAYS VISIBLE: Bottom Section ═══ -->
+    <div class="bottom-section">
+      <div class="bottom-grid">
+        <!-- Active Alarms -->
+        <div class="glass-panel alarms-panel">
+          <div class="panel-header">
+            <i class="fa-solid fa-bell-concierge panel-icon"></i>
+            <h3>Aktif Alarmlar</h3>
+            <span class="alarm-count" id="alarmCount">0</span>
+          </div>
+          <div class="alarms-list" id="alarmsList">
+            <div class="empty-placeholder">
+              <i class="fa-regular fa-bell-slash"></i>
+              <span>Henüz alarm yok</span>
             </div>
           </div>
+        </div>
 
-          <!-- Logs -->
-          <div class="glass-panel logs-panel">
-            <div class="panel-header">
-              <i class="fa-solid fa-terminal panel-icon"></i>
-              <h3>Sistem Logları</h3>
-            </div>
-            <div class="logs-list" id="logsList">
-              <div class="log-entry sys">Sistem yükleniyor...</div>
-            </div>
+        <!-- System Logs -->
+        <div class="glass-panel logs-panel">
+          <div class="panel-header">
+            <i class="fa-solid fa-terminal panel-icon"></i>
+            <h3>Sistem Logları</h3>
+          </div>
+          <div class="logs-list" id="logsList">
+            <div class="log-entry sys">Sistem yükleniyor...</div>
+          </div>
+        </div>
+
+        <!-- Telegram Setup Card -->
+        <div class="glass-panel tg-card">
+          <div class="panel-header">
+            <i class="fa-brands fa-telegram panel-icon" style="color:#229ed9"></i>
+            <h3>Telegram Kurulumu</h3>
+          </div>
+          <div class="tg-card-body">
+            <div class="tg-step"><span class="tg-num">1</span> Railway'de <code>TELEGRAM_BOT_TOKEN</code> env'i ekleyin.</div>
+            <div class="tg-step"><span class="tg-num">2</span> Botu gruba ekleyip <b>Admin</b> yapın.</div>
+            <div class="tg-step"><span class="tg-num">3</span> Alarm kurarken Chat ID'yi girin (veya boş bırakın).</div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Telegram Helper (shown when no step2) -->
-    <div class="tg-setup-hint glass-panel" id="tgHint">
-      <i class="fa-brands fa-telegram"></i>
-      <div>
-        <strong>Telegram Kurulumu:</strong> Railway'de <code>TELEGRAM_BOT_TOKEN</code> env'i ekleyin, botu gruba admin yapın, Chat ID'yi alarm kurarken girin.
+  <!-- ═══ EDIT ALARM MODAL ═══ -->
+  <div class="modal-overlay hidden" id="editModal">
+    <div class="modal-card glass-panel">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-pen-to-square"></i> Alarm Düzenle</h3>
+        <button class="modal-close" id="editModalClose"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-market-title" id="editTitle">Market Başlığı</div>
+
+        <div class="modal-field">
+          <label class="field-label">Seçenek</label>
+          <div class="modal-outcome-btns" id="editOutcomeBtns">
+            <button class="outcome-btn active" data-outcome="yes">YES</button>
+            <button class="outcome-btn" data-outcome="no">NO</button>
+          </div>
+        </div>
+
+        <div class="modal-field">
+          <label class="field-label">Alarm Türü</label>
+          <div class="modal-type-cards" id="editTypeCards">
+            <div class="alarm-type-card-mini" data-type="bid_above"><span class="dot green-dot"></span> Yükselirse Uyar</div>
+            <div class="alarm-type-card-mini" data-type="ask_below"><span class="dot red-dot"></span> Düşerse Uyar</div>
+            <div class="alarm-type-card-mini" data-type="wall_created"><span class="dot orange-dot"></span> Duvar Tespiti</div>
+            <div class="alarm-type-card-mini" data-type="liquidity_surge"><span class="dot cyan-dot"></span> Likidite Patlaması</div>
+          </div>
+        </div>
+
+        <div class="modal-field">
+          <label class="field-label" id="editThresholdLabel">Hedef Fiyat</label>
+          <div class="threshold-input-wrap">
+            <input type="number" id="editThresholdValue" step="0.01" placeholder="0.25">
+            <span class="threshold-suffix" id="editThresholdSuffix">$</span>
+          </div>
+        </div>
+
+        <div class="modal-field">
+          <label class="field-label">Telegram Chat ID</label>
+          <input type="text" id="editChatId" class="modal-input" placeholder="Boş bırakırsan genel kanal">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-cancel-btn" id="editCancelBtn">İptal</button>
+        <button class="modal-save-btn" id="editSaveBtn"><i class="fa-solid fa-check"></i> Kaydet</button>
       </div>
     </div>
   </div>

@@ -98,6 +98,27 @@ app.post('/api/alarms/:id/toggle', (req, res) => {
   }
 });
 
+// 5b. Update an alarm
+app.put('/api/alarms/:id', (req, res) => {
+  try {
+    const existing = db.getAlarms().find(a => a.id === req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Alarm not found' });
+
+    const { alarmType, threshold, chatId, outcome } = req.body;
+    const updated = db.saveAlarm({
+      ...existing,
+      alarmType: alarmType || existing.alarmType,
+      threshold: threshold !== undefined ? Number(threshold) : existing.threshold,
+      chatId: (chatId && chatId.trim()) ? chatId.trim() : existing.chatId,
+      outcome: outcome || existing.outcome
+    });
+    db.addLog(`Alarm güncellendi: ${updated.title} → ${updated.alarmType} @ ${updated.threshold}`);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 6. Resolve Polymarket URL / slug
 app.post('/api/resolve', async (req, res) => {
   const { urlOrSlug } = req.body;

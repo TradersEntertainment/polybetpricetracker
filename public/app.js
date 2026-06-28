@@ -3,7 +3,8 @@ let currentMarket = null;
 let currentOutcome = 'yes';
 let currentTokenId = null;
 let orderbookPollInterval = null;
-let selectedAlarmType = 'bid_above'; // Default: yükselirse uyar
+let selectedAlarmType = 'bid_above';
+let editingAlarmId = null;
 
 // ─── DOM ───
 const $ = id => document.getElementById(id);
@@ -11,7 +12,6 @@ const marketUrlInput = $('marketUrl');
 const resolveBtn = $('resolveBtn');
 const resolveLoader = $('resolveLoader');
 const step2 = $('step2');
-const tgHint = $('tgHint');
 const resolvedQuestion = $('resolvedQuestion');
 const marketBadges = $('marketBadges');
 const outcomeButtons = $('outcomeButtons');
@@ -31,6 +31,19 @@ const toastEl = $('toast');
 const toastIcon = $('toastIcon');
 const toastMsg = $('toastMessage');
 
+// Edit Modal DOM
+const editModal = $('editModal');
+const editModalClose = $('editModalClose');
+const editCancelBtn = $('editCancelBtn');
+const editSaveBtn = $('editSaveBtn');
+const editTitle = $('editTitle');
+const editOutcomeBtns = $('editOutcomeBtns');
+const editTypeCards = $('editTypeCards');
+const editThresholdValue = $('editThresholdValue');
+const editThresholdLabel = $('editThresholdLabel');
+const editThresholdSuffix = $('editThresholdSuffix');
+const editChatId = $('editChatId');
+
 // ─── Init ───
 window.addEventListener('DOMContentLoaded', () => {
   fetchAlarms();
@@ -43,15 +56,40 @@ window.addEventListener('DOMContentLoaded', () => {
   const savedChat = localStorage.getItem('tg_chat_id');
   if (savedChat) chatIdInput.value = savedChat;
 
-  // Alarm type card clicks
-  document.querySelectorAll('.alarm-type-card').forEach(card => {
+  // Alarm type card clicks (create form)
+  document.querySelectorAll('#alarmTypeCards .alarm-type-card').forEach(card => {
     card.addEventListener('click', () => {
-      document.querySelectorAll('.alarm-type-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('#alarmTypeCards .alarm-type-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
       selectedAlarmType = card.dataset.type;
       updateThresholdUI();
     });
   });
+
+  // Edit modal type cards
+  editTypeCards.addEventListener('click', e => {
+    const card = e.target.closest('.alarm-type-card-mini');
+    if (!card) return;
+    editTypeCards.querySelectorAll('.alarm-type-card-mini').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    updateEditThresholdUI(card.dataset.type);
+  });
+
+  // Edit modal outcome buttons
+  editOutcomeBtns.addEventListener('click', e => {
+    const btn = e.target.closest('.outcome-btn');
+    if (!btn) return;
+    editOutcomeBtns.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+
+  // Close modal
+  editModalClose.addEventListener('click', closeEditModal);
+  editCancelBtn.addEventListener('click', closeEditModal);
+  editModal.addEventListener('click', e => { if (e.target === editModal) closeEditModal(); });
+
+  // Save edit
+  editSaveBtn.addEventListener('click', handleEditSave);
 });
 
 // ─── URL Events ───
@@ -88,7 +126,6 @@ async function handleResolve() {
     orderbookPollInterval = setInterval(fetchAndRenderOrderbook, 5000);
     resolveLoader.classList.add('hidden');
     step2.classList.remove('hidden');
-    if (tgHint) tgHint.classList.add('hidden');
     showToast('Market çözümlendi!', 'success');
   } catch (err) {
     resolveLoader.classList.add('hidden');
@@ -131,10 +168,10 @@ function renderMarketInfo() {
   });
 }
 
-// ─── Threshold UI by alarm type ───
+// ─── Threshold UI ───
 function updateThresholdUI() {
   const t = selectedAlarmType;
-  if (t === 'bid_above' || t === 'ask_below' || t === 'price_above' || t === 'price_below') {
+  if (t === 'bid_above' || t === 'ask_below') {
     thresholdLabel.textContent = 'Hedef Fiyat';
     thresholdSuffix.textContent = '$';
     thresholdValueInput.step = '0.01';
@@ -178,7 +215,7 @@ async function fetchAndRenderOrderbook() {
 function renderOrderbook(book) {
   const bids = book.bids || [];
   const asks = book.asks || [];
-  const spread = book.spread !== null ? book.spread.toFixed(2) : '--';
+  const spread = book.spread !== null && book.spread !== undefined ? book.spread.toFixed(2) : '--';
   const mid = book.midPrice || '--';
   obMidPrice.textContent = `Mid: ${mid}$ | Spread: ${spread}$`;
 
@@ -192,7 +229,6 @@ function renderOrderbook(book) {
   obAsksList.innerHTML = asks.length === 0 ? '<div class="ob-empty">Satış emri yok</div>' :
     asks.slice(0, 20).map(a => obRowHtml(a, maxSize, wallThreshold)).join('');
 
-  // Click to fill threshold
   document.querySelectorAll('.ob-row').forEach(row => {
     row.addEventListener('click', () => {
       const p = row.dataset.price;
@@ -244,13 +280,10 @@ saveAlarmBtn.addEventListener('click', async () => {
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-
     showToast('Alarm kuruldu!', 'success');
     fetchAlarms();
     fetchLogs();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
+  } catch (err) { showToast(err.message, 'error'); }
 });
 
 // ─── Test Telegram ───
@@ -270,7 +303,9 @@ testTelegramBtn.addEventListener('click', async () => {
   } catch (err) { showToast(err.message, 'error'); }
 });
 
-// ─── Alarms List ───
+// ═══════════════════════════════════════
+// ─── ALARMS LIST (clickable to edit) ───
+// ═══════════════════════════════════════
 async function fetchAlarms() {
   try {
     const res = await fetch('/api/alarms');
@@ -285,21 +320,13 @@ async function fetchAlarms() {
     alarmsList.innerHTML = alarms.map(a => {
       const cls = a.active ? '' : 'inactive';
       const togIcon = a.active ? 'fa-pause' : 'fa-play';
-      let kind = '', suffix = '';
-      switch (a.alarmType) {
-        case 'bid_above': kind = 'Yükselirse 📈'; suffix = '$'; break;
-        case 'ask_below': kind = 'Düşerse 📉'; suffix = '$'; break;
-        case 'price_above': kind = 'Mid Üzeri 📈'; suffix = '$'; break;
-        case 'price_below': kind = 'Mid Altı 📉'; suffix = '$'; break;
-        case 'wall_created': kind = 'Duvar 🐳'; suffix = ' Adet'; break;
-        case 'liquidity_surge': kind = 'Likidite 🌊'; suffix = '%'; break;
-      }
-      return `<div class="alarm-item ${cls}">
+      const { kind, suffix } = alarmMeta(a.alarmType);
+      return `<div class="alarm-item ${cls}" data-alarm-id="${a.id}">
         <div class="alarm-item-top">
           <div class="alarm-item-title" title="${a.title}">${a.title}</div>
           <div class="alarm-item-actions">
-            <button onclick="toggleAlarm('${a.id}')" title="${a.active ? 'Durdur' : 'Başlat'}"><i class="fa-solid ${togIcon}"></i></button>
-            <button class="del" onclick="deleteAlarm('${a.id}')" title="Sil"><i class="fa-solid fa-trash"></i></button>
+            <button onclick="event.stopPropagation(); toggleAlarm('${a.id}')" title="${a.active ? 'Durdur' : 'Başlat'}"><i class="fa-solid ${togIcon}"></i></button>
+            <button class="del" onclick="event.stopPropagation(); deleteAlarm('${a.id}')" title="Sil"><i class="fa-solid fa-trash"></i></button>
           </div>
         </div>
         <div class="alarm-item-tags">
@@ -309,9 +336,114 @@ async function fetchAlarms() {
         </div>
       </div>`;
     }).join('');
+
+    // Click on alarm item → open edit modal
+    alarmsList.querySelectorAll('.alarm-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const id = item.dataset.alarmId;
+        const alarm = alarms.find(a => a.id === id);
+        if (alarm) openEditModal(alarm);
+      });
+    });
   } catch (err) { console.error('Alarms fetch error:', err); }
 }
 
+function alarmMeta(type) {
+  switch (type) {
+    case 'bid_above': return { kind: 'Yükselirse 📈', suffix: '$' };
+    case 'ask_below': return { kind: 'Düşerse 📉', suffix: '$' };
+    case 'price_above': return { kind: 'Mid Üzeri 📈', suffix: '$' };
+    case 'price_below': return { kind: 'Mid Altı 📉', suffix: '$' };
+    case 'wall_created': return { kind: 'Duvar 🐳', suffix: ' Adet' };
+    case 'liquidity_surge': return { kind: 'Likidite 🌊', suffix: '%' };
+    default: return { kind: type, suffix: '' };
+  }
+}
+
+// ═══════════════════════════
+// ─── EDIT MODAL ───────────
+// ═══════════════════════════
+function openEditModal(alarm) {
+  editingAlarmId = alarm.id;
+
+  // Title
+  editTitle.textContent = alarm.title;
+
+  // Outcome
+  editOutcomeBtns.querySelectorAll('.outcome-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.outcome === alarm.outcome);
+  });
+
+  // Alarm type
+  editTypeCards.querySelectorAll('.alarm-type-card-mini').forEach(card => {
+    card.classList.toggle('selected', card.dataset.type === alarm.alarmType);
+  });
+
+  // Threshold
+  editThresholdValue.value = alarm.threshold;
+  updateEditThresholdUI(alarm.alarmType);
+
+  // Chat ID
+  editChatId.value = alarm.chatId || '';
+
+  // Show
+  editModal.classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEditModal() {
+  editModal.classList.add('hidden');
+  document.body.style.overflow = '';
+  editingAlarmId = null;
+}
+
+function updateEditThresholdUI(type) {
+  if (type === 'bid_above' || type === 'ask_below' || type === 'price_above' || type === 'price_below') {
+    editThresholdLabel.textContent = 'Hedef Fiyat';
+    editThresholdSuffix.textContent = '$';
+    editThresholdValue.step = '0.01';
+  } else if (type === 'wall_created') {
+    editThresholdLabel.textContent = 'Minimum Duvar Boyutu';
+    editThresholdSuffix.textContent = 'Adet';
+    editThresholdValue.step = '1000';
+  } else if (type === 'liquidity_surge') {
+    editThresholdLabel.textContent = 'Kalınlaşma Oranı';
+    editThresholdSuffix.textContent = '%';
+    editThresholdValue.step = '5';
+  }
+}
+
+async function handleEditSave() {
+  if (!editingAlarmId) return;
+
+  const selectedType = editTypeCards.querySelector('.alarm-type-card-mini.selected')?.dataset.type;
+  const selectedOutcome = editOutcomeBtns.querySelector('.outcome-btn.active')?.dataset.outcome;
+  const threshold = Number(editThresholdValue.value);
+  const chatId = editChatId.value.trim();
+
+  if (!selectedType) return showToast('Alarm türü seçin.', 'error');
+  if (isNaN(threshold) || threshold <= 0) return showToast('Geçerli limit girin.', 'error');
+
+  try {
+    const res = await fetch(`/api/alarms/${editingAlarmId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        alarmType: selectedType,
+        outcome: selectedOutcome,
+        threshold,
+        chatId
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Alarm güncellendi!', 'success');
+    closeEditModal();
+    fetchAlarms();
+    fetchLogs();
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+// ─── Delete & Toggle (global) ───
 window.deleteAlarm = async id => {
   if (!confirm('Alarm silinsin mi?')) return;
   try {
