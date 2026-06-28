@@ -16,6 +16,7 @@ const orderbookSection = $('orderbookSection');
 const resolvedQuestion = $('resolvedQuestion');
 const marketBadges = $('marketBadges');
 const outcomeButtons = $('outcomeButtons');
+const sidebarOutcomeButtons = $('sidebarOutcomeButtons');
 const obMidPrice = $('obMidPrice');
 const obBidsList = $('obBidsList');
 const obAsksList = $('obAsksList');
@@ -175,21 +176,46 @@ function renderMarketBar() {
     </div>
   `;
 
-  outcomeButtons.querySelectorAll('.outcome-pill').forEach(pill => {
-    pill.addEventListener('click', async () => {
-      const oc = pill.dataset.outcome;
-      if (oc === currentOutcome) return;
-      outcomeButtons.querySelectorAll('.outcome-pill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      currentOutcome = oc;
-      currentTokenId = currentMarket.clobTokenIds[oc === 'yes' ? 0 : 1];
-      const idx = oc === 'yes' ? 0 : 1;
-      if (currentMarket.prices?.[idx] !== undefined) {
-        thresholdValueInput.value = currentMarket.prices[idx].toFixed(2);
-      }
-      await fetchAndRenderOrderbook();
-    });
+  // Set initial sidebar selection active class
+  sidebarOutcomeButtons.querySelectorAll('.sidebar-outcome-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.outcome === 'yes');
   });
+
+  // Bind Topbar Outcome pills click
+  outcomeButtons.querySelectorAll('.outcome-pill').forEach(pill => {
+    pill.addEventListener('click', () => setOutcome(pill.dataset.outcome));
+  });
+
+  // Bind Sidebar Outcome buttons click
+  sidebarOutcomeButtons.querySelectorAll('.sidebar-outcome-btn').forEach(btn => {
+    btn.addEventListener('click', () => setOutcome(btn.dataset.outcome));
+  });
+}
+
+// ─── Set Outcome (Sync UI) ───
+async function setOutcome(oc) {
+  if (oc === currentOutcome) return;
+  currentOutcome = oc;
+  currentTokenId = currentMarket.clobTokenIds[oc === 'yes' ? 0 : 1];
+  
+  // Update Topbar UI
+  outcomeButtons.querySelectorAll('.outcome-pill').forEach(p => {
+    p.classList.toggle('active', p.dataset.outcome === oc);
+  });
+
+  // Update Sidebar UI
+  sidebarOutcomeButtons.querySelectorAll('.sidebar-outcome-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.outcome === oc);
+  });
+
+  // Update Threshold Input
+  const idx = oc === 'yes' ? 0 : 1;
+  if (currentMarket.prices?.[idx] !== undefined) {
+    thresholdValueInput.value = currentMarket.prices[idx].toFixed(2);
+  }
+
+  // Fetch new orderbook
+  await fetchAndRenderOrderbook();
 }
 
 // ─── Orderbook ───

@@ -88,7 +88,11 @@
       <div class="sidebar-divider"></div>
 
       <!-- Target Price -->
-      <label class="sidebar-label">Target Price</label>
+      <label class="sidebar-label">Target Price & Outcome</label>
+      <div class="sidebar-outcome-row" id="sidebarOutcomeButtons">
+        <button type="button" class="sidebar-outcome-btn active" data-outcome="yes">YES</button>
+        <button type="button" class="sidebar-outcome-btn" data-outcome="no">NO</button>
+      </div>
       <div class="price-input-wrap">
         <input type="number" id="thresholdValue" step="0.01" placeholder="0.18" value="">
         <span class="price-suffix">$</span>
