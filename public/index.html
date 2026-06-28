@@ -39,27 +39,14 @@
       <!-- Alarm Type Toggles -->
       <div class="alert-option">
         <div class="alert-option-top">
-          <span class="alert-emoji">📈</span>
-          <span class="alert-name">Price Increases</span>
-          <label class="toggle"><input type="checkbox" id="togBidAbove" checked><span class="slider"></span></label>
+          <span class="alert-emoji">🔔</span>
+          <span class="alert-name">Price Target Alert</span>
+          <label class="toggle"><input type="checkbox" id="togPriceAlert" checked><span class="slider"></span></label>
         </div>
-        <p class="alert-desc">En iyi alış fiyatı (Best Bid) hedefe ulaşınca bildirim.</p>
-        <button class="settings-toggle" data-target="settingsBidAbove"><i class="fa-solid fa-gear"></i> Settings</button>
-        <div class="settings-panel hidden" id="settingsBidAbove">
-          <p class="settings-note">Hedef fiyatı aşağıdaki "Target Price" alanından ayarlayın.</p>
-        </div>
-      </div>
-
-      <div class="alert-option">
-        <div class="alert-option-top">
-          <span class="alert-emoji">📉</span>
-          <span class="alert-name">Price Decreases</span>
-          <label class="toggle"><input type="checkbox" id="togAskBelow"><span class="slider"></span></label>
-        </div>
-        <p class="alert-desc">En iyi satış fiyatı (Best Ask) hedefe düşünce bildirim.</p>
-        <button class="settings-toggle" data-target="settingsAskBelow"><i class="fa-solid fa-gear"></i> Settings</button>
-        <div class="settings-panel hidden" id="settingsAskBelow">
-          <p class="settings-note">Hedef fiyatı aşağıdaki "Target Price" alanından ayarlayın.</p>
+        <p class="alert-desc">Belirlediğiniz hedef fiyata ulaşıldığında bildirim gönderir.</p>
+        <button class="settings-toggle" data-target="settingsPriceAlert"><i class="fa-solid fa-gear"></i> Settings</button>
+        <div class="settings-panel hidden" id="settingsPriceAlert">
+          <p class="settings-note">Hedef fiyata göre artış (📈) veya düşüş (📉) yönü otomatik belirlenir.</p>
         </div>
       </div>
 

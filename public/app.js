@@ -374,15 +374,6 @@ function getWallThreshold() {
   return 5000;
 }
 
-// ─── Determine active alarm types from sidebar toggles ───
-function getSelectedAlarmType() {
-  if ($('togBidAbove')?.checked) return 'bid_above';
-  if ($('togAskBelow')?.checked) return 'ask_below';
-  if ($('togWall')?.checked) return 'wall_created';
-  if ($('togLiquidity')?.checked) return 'liquidity_surge';
-  return 'bid_above';
-}
-
 // ─── Save Alarm ───
 saveAlarmBtn.addEventListener('click', async () => {
   if (!currentMarket || !currentTokenId) return showToast('Önce bir market çözümleyin.', 'error');
@@ -392,8 +383,28 @@ saveAlarmBtn.addEventListener('click', async () => {
 
   // Create alarms for each checked type
   const types = [];
-  if ($('togBidAbove')?.checked) types.push({ type: 'bid_above', threshold: Number(thresholdValueInput.value) });
-  if ($('togAskBelow')?.checked) types.push({ type: 'ask_below', threshold: Number(thresholdValueInput.value) });
+  
+  if ($('togPriceAlert')?.checked) {
+    const targetVal = Number(thresholdValueInput.value);
+    if (isNaN(targetVal) || targetVal <= 0) {
+      return showToast('Geçerli bir hedef fiyat girin.', 'error');
+    }
+    
+    // Get current price to determine direction
+    let currentPrice = 0.50;
+    if (lastBookData && lastBookData.midPrice) {
+      currentPrice = lastBookData.midPrice;
+    } else {
+      const idx = currentOutcome === 'yes' ? 0 : 1;
+      if (currentMarket.prices?.[idx] !== undefined) {
+        currentPrice = currentMarket.prices[idx];
+      }
+    }
+    
+    const direction = targetVal >= currentPrice ? 'bid_above' : 'ask_below';
+    types.push({ type: direction, threshold: targetVal });
+  }
+
   if ($('togWall')?.checked) types.push({ type: 'wall_created', threshold: Number($('wallThreshold')?.value || 5000) });
   if ($('togLiquidity')?.checked) types.push({ type: 'liquidity_surge', threshold: Number($('liquidityThreshold')?.value || 50) });
 
